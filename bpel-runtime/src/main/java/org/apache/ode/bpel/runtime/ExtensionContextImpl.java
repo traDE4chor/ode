@@ -118,8 +118,15 @@ public class ExtensionContextImpl implements ExtensionContext {
         _context.writeVariable(vi, value);
     }
 
-    private Variable getVisibleVariable(String varName) {
-        return _scopeFrame.oscope.getVisibleVariable(varName);
+    private Variable getVisibleVariable(String varName) throws FaultException {
+    	Variable var = _scopeFrame.oscope.getVisibleVariable(varName);
+    	
+    	if (var == null) {
+    		throw new FaultException(new QName(Bpel20QNames.NS_WSBPEL2_0, "subLanguageExecutionFault"),
+    				"Attempt to reference undeclared variable '" + varName + "' in BPEL extension activity.");
+    	}
+    			
+        return var;
     }
 
     public BpelRuntimeContext getBpelRuntimeContext() {
