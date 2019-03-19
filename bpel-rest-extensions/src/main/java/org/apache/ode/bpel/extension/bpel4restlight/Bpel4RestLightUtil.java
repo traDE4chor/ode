@@ -41,6 +41,31 @@ public class Bpel4RestLightUtil {
 	private static final Logger logger = LoggerFactory.getLogger(Bpel4RestLightUtil.class);
 	
     private static final String VARIABLE_VALUE_REFERENCE = "$bpelvar[";
+    
+    /**
+     * This method checks whether a request payload is specified or not.
+     * 
+     * @param context The extension context required to resolve variable values.
+     * @param element element The extension activity DOM element containing the request payload
+     * @return True, if the provided extension activity specifies a request. False, otherwise
+     */
+    public static boolean specifiesRequest(ExtensionContext context, Element element) {
+    	boolean specifiesRequest = false;
+    	
+        // Check if a reference to a variable is specified
+        if (element.hasAttribute("request") || element.hasAttribute("requestPayload")) {
+        	specifiesRequest = true;
+        } else {
+        	// If no variable was specified, check if a static request payload is specified
+        	Node request = DOMUtils.findChildByType(element, Node.ELEMENT_NODE);
+
+            if (request != null) {
+            	specifiesRequest = true;
+            }
+        }
+        
+        return specifiesRequest;
+    }
 
     /**
      * This method extracts the request message payload from the provided extension activity. This

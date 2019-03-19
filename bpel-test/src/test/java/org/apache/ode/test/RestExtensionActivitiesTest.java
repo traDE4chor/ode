@@ -96,6 +96,46 @@ public class RestExtensionActivitiesTest extends BPELTestAbstract {
     public void testPostExtActWithWrappedRequest() throws Throwable {
         go("/bpel/2.0/TestRestPostExtAct2");
     }
+    
+    /**
+     * Tests the "POST" REST extension activity without a request message specified.
+     * 
+     * @throws Throwable
+     */
+    @Test
+    public void testPostExtActWithoutRequest() throws Throwable {
+        go("/bpel/2.0/TestRestPostExtActNoRequest");
+    }
+    
+    /**
+     * Tests the "POST" REST extension activity with undeclared request variable specified.
+     * 
+     * @throws Throwable
+     */
+    @Test
+    public void testPostExtActWithUndeclaredRequestVariable() throws Throwable {
+        go("/bpel/2.0/TestRestPostExtActUndeclaredRequestVariable");
+    }
+    
+    /**
+     * Tests the "POST" REST extension activity with non-initialized request variable specified.
+     * 
+     * @throws Throwable
+     */
+    @Test
+    public void testPostExtActWithNonInitializedRequestVariable() throws Throwable {
+        go("/bpel/2.0/TestRestPostExtActNonInitializedRequestVariable");
+    }
+    
+    /**
+     * Tests the "POST" REST extension activity with an empty request variable specified (variableName="").
+     * 
+     * @throws Throwable
+     */
+    @Test
+    public void testPostExtActWithEmptyRequestVariable() throws Throwable {
+        go("/bpel/2.0/TestRestPostExtActEmptyRequestVariable");
+    }
 
     /**
      * Tests the "PUT" REST extension activity.
@@ -105,6 +145,16 @@ public class RestExtensionActivitiesTest extends BPELTestAbstract {
     @Test
     public void testPutExtAct() throws Throwable {
         go("/bpel/2.0/TestRestPutExtAct");
+    }
+    
+    /**
+     * Tests the "PUT" REST extension activity without a request message specified..
+     * 
+     * @throws Throwable
+     */
+    @Test
+    public void testPutExtActWithoutRequest() throws Throwable {
+        go("/bpel/2.0/TestRestPutExtActNoRequest");
     }
 
     /**
@@ -172,24 +222,42 @@ public class RestExtensionActivitiesTest extends BPELTestAbstract {
         } else if (method.toUpperCase().equals("POST")) {
             String request = IOUtils.toString(exchange.getRequestBody());
 
-            String requestValue = "";
-            try {
-                Node reqNode = DOMUtils.stringToDOM(request);
+            if (request != null && !request.isEmpty()) {
+            	String requestValue = "";
+                try {
+                    Node reqNode = DOMUtils.stringToDOM(request);
 
-                NodeList list = reqNode.getChildNodes();
-                int i = 0;
-                while (i < list.getLength()) {
-                    Node node = list.item(i);
-                    if (node.getNodeType() == Node.ELEMENT_NODE
-                            && ((Element) node).getLocalName().equals("value")) {
-                        requestValue = node.getTextContent();
+                    NodeList list = reqNode.getChildNodes();
+                    int i = 0;
+                    while (i < list.getLength()) {
+                        Node node = list.item(i);
+                        if (node.getNodeType() == Node.ELEMENT_NODE
+                                && ((Element) node).getLocalName().equals("value")) {
+                            requestValue = node.getTextContent();
+                        }
+                        i++;
                     }
-                    i++;
-                }
 
-                String response =
+                    String response =
+                            "<service:postResponse xmlns:service=\"http://www.example.org/restApi\">\n"
+                                    + "                        <service:result>" + requestValue
+                                    + " Result</service:result>\n"
+                                    + "                    </service:postResponse>";
+
+                    byte[] bResponse = response.getBytes();
+
+                    exchange.sendResponseHeaders(HttpURLConnection.HTTP_OK, bResponse.length);
+                    exchange.getResponseBody().write(bResponse);
+                } catch (SAXException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+
+                    exchange.sendResponseHeaders(HttpURLConnection.HTTP_INTERNAL_ERROR, 0);
+                }
+            } else {
+            	String response =
                         "<service:postResponse xmlns:service=\"http://www.example.org/restApi\">\n"
-                                + "                        <service:result>" + requestValue
+                                + "                        <service:result>" + "No request specified"
                                 + " Result</service:result>\n"
                                 + "                    </service:postResponse>";
 
@@ -197,17 +265,13 @@ public class RestExtensionActivitiesTest extends BPELTestAbstract {
 
                 exchange.sendResponseHeaders(HttpURLConnection.HTTP_OK, bResponse.length);
                 exchange.getResponseBody().write(bResponse);
-            } catch (SAXException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-
-                exchange.sendResponseHeaders(HttpURLConnection.HTTP_INTERNAL_ERROR, 0);
             }
 
             exchange.close();
         } else if (method.toUpperCase().equals("PUT")) {
             String request = IOUtils.toString(exchange.getRequestBody());
 
+            if (request != null && !request.isEmpty()) {
             String requestValue = "";
             try {
                 Node reqNode = DOMUtils.stringToDOM(request);
@@ -238,6 +302,18 @@ public class RestExtensionActivitiesTest extends BPELTestAbstract {
                 e.printStackTrace();
 
                 exchange.sendResponseHeaders(HttpURLConnection.HTTP_INTERNAL_ERROR, 0);
+            }
+            } else {
+            	String response =
+                        "<service:putResponse xmlns:service=\"http://www.example.org/restApi\">\n"
+                                + "                        <service:result>" + "No request specified"
+                                + " Result</service:result>\n"
+                                + "                    </service:putResponse>";
+
+                byte[] bResponse = response.getBytes();
+
+                exchange.sendResponseHeaders(HttpURLConnection.HTTP_OK, bResponse.length);
+                exchange.getResponseBody().write(bResponse);
             }
 
             exchange.close();

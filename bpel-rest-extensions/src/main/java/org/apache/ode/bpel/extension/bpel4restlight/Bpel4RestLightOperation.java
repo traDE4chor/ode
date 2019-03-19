@@ -63,26 +63,41 @@ public class Bpel4RestLightOperation extends AbstractSyncExtensionOperation {
         switch (HttpMethod.valueOf(httpMethod)) {
 
             case PUT: {
-                String requestPayload = Bpel4RestLightUtil.extractRequestPayload(context, element);
-                
-                responseMessage = HighLevelRestApi.Put(requestUri, requestPayload, acceptHeader, contentType);
-                
-                if (logger.isDebugEnabled()) {
-                	logger.debug("Request message payload: " + requestPayload);
-                }
-                
+        		if (Bpel4RestLightUtil.specifiesRequest(context, element)) {
+        			String requestPayload = Bpel4RestLightUtil.extractRequestPayload(context, element);
+            		
+            		responseMessage = HighLevelRestApi.Put(requestUri, requestPayload, acceptHeader, contentType);
+            		
+            		if (logger.isDebugEnabled()) {
+            			logger.debug("Request message payload: " + requestPayload);
+            		}
+        		} else {
+        			if (logger.isDebugEnabled()) {
+            			logger.debug("Request message payload is empty");
+            		}
+        			
+        			responseMessage = HighLevelRestApi.Put(requestUri, acceptHeader);
+        		}
+        		
                 break;
             }
 
             case POST: {
-                String requestPayload = Bpel4RestLightUtil.extractRequestPayload(context, element);
-                
-                responseMessage = HighLevelRestApi.Post(requestUri, requestPayload, acceptHeader, contentType);
-                
-                if (logger.isDebugEnabled()) {
-                	logger.debug("Request message payload: \n" + requestPayload);
-                }
-                
+            	if (Bpel4RestLightUtil.specifiesRequest(context, element)) {      		
+            		String requestPayload = Bpel4RestLightUtil.extractRequestPayload(context, element);
+            		
+            		responseMessage = HighLevelRestApi.Post(requestUri, requestPayload, acceptHeader, contentType);
+            		
+            		if (logger.isDebugEnabled()) {
+            			logger.debug("Request message payload: \n" + requestPayload);
+            		}
+            	} else {
+            		if (logger.isDebugEnabled()) {
+            			logger.debug("Request message payload is empty");
+            		}
+            		
+            		responseMessage = HighLevelRestApi.Post(requestUri, acceptHeader);
+            	}                
                 break;
             }
 
@@ -113,8 +128,13 @@ public class Bpel4RestLightOperation extends AbstractSyncExtensionOperation {
                 element, MethodAttribute.RESPONSE_PAYLOAD_VARIABLE);
         String statusCodeVariableName = Bpel4RestLightUtil.getMethodAttributeValue(context, element,
                 MethodAttribute.STATUS_CODE_VARIABLE);
+                       
+        String responsePayload = responseMessage.getResponseBody();
         
-        String responsePayload = responseMessage.getResponseBody().trim();
+        if (responsePayload != null && !responsePayload.isEmpty()) {
+        	responsePayload = responsePayload.trim();
+        }
+        
         int statusCode = responseMessage.getStatusCode();
         
         if (responsePayloadVariableName != null && !responsePayloadVariableName.isEmpty()) {
