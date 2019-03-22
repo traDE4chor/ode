@@ -817,7 +817,7 @@ define "apache-ode" do
     # distros require all packages in project("ode") to be built first
     project.package(:zip, :id=>id).enhance(project("ode").projects.map(&:packages).flatten) do |pkg|
       pkg.path("#{id}-#{version}").tap do |zip|
-        zip.include meta_inf + ["RELEASE_NOTES", "README"].map { |f| path_to(f) }
+        zip.include meta_inf + ["RELEASE_NOTES", "README.md"].map { |f| path_to(f) }
         zip.path("examples").include(project.path_to("src/examples"+postfix), :as=>".").exclude "**/target"
 
         # Libraries
