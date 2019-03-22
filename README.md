@@ -1,8 +1,6 @@
 [![Docker Status](https://dockerbuildbadges.quelltext.eu/status.svg?organization=trade4chor&repository=trade-ode)](https://hub.docker.com/r/trade4chor/trade-ode/)
 
-==============
-  Apache ODE
-==============
+# Apache ODE
 
 Apache ODE is a WS-BPEL compliant web services orchestration engine.
 It organizes web services calls following a process description
