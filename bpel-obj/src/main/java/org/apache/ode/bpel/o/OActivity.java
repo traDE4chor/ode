@@ -38,6 +38,10 @@ public abstract class OActivity extends OAgent {
     public final Set<OLink>targetLinks = new HashSet<OLink>();
     public String name;
     public OFailureHandling failureHandling;
+    
+    // @hahnml: OModel for TraDE associations (extension elements)
+    public OTraDEAssociation tradeAssociation;
+    
     private OActivity parent;
 
     public String getType() {
@@ -67,6 +71,15 @@ public abstract class OActivity extends OAgent {
 
     public void setFailureHandling(OFailureHandling failureHandling) {
         this.failureHandling = failureHandling;
+    }
+    
+    // @hahnml
+    public OTraDEAssociation getTraDEAssociation() {
+        return this.tradeAssociation;
+    }
+    // @hahnml
+    public void setTraDEAssociation(OTraDEAssociation assoc) {
+        this.tradeAssociation = assoc;
     }
 
     public String toString() {

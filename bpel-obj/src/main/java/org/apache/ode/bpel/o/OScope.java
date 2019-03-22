@@ -66,6 +66,9 @@ public class OScope extends OActivity {
     public boolean implicitScope;
 
     public boolean atomicScope;
+    
+    //@hahnml: Allows to link variables with TraDE data objects
+    public OTraDEAssociation tradeAssociation;
 
     public OScope(OProcess owner, OActivity parent) {
         super(owner, parent);
@@ -173,6 +176,9 @@ public class OScope extends OActivity {
         public String name;
         public OScope declaringScope;
         public OVarType type;
+        
+        //@hahnml: Allows to link variables with TraDE data objects
+        public OTraDEAssociation tradeAssociation;
 
         /** If not-null indicates that this variable has an external representation. */
         public OExtVar extVar;

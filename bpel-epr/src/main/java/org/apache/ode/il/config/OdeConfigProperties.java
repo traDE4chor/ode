@@ -107,6 +107,17 @@ public class OdeConfigProperties {
     public static final String DEFAULT_TX_FACTORY_CLASS_NAME = "org.apache.ode.il.EmbeddedGeronimoFactory";
     
     public static final String PROP_EXTENSION_BUNDLES = "extension.bundles";
+    
+    // @hahnml: New property to specify the TraDE Middleware URL
+    public static final String PROP_TraDE_URL = "traDE.url";
+    
+    // @hahnml: New property to specify the dynamically assigned host port of
+    // the Tomcat for containerized ODE setups (e.g. using Docker)
+    public static final String PROP_HOST_IP = "host.ip";
+    
+    // @hahnml: New property to specify the dynamically assigned host port of
+    // the Tomcat for containerized ODE setups (e.g. using Docker)
+    public static final String PROP_DYNAMIC_CONTAINER_PORT = "container.port";
 
     private File _cfgFile;
 
@@ -347,6 +358,24 @@ public class OdeConfigProperties {
     
     public boolean isDbLoggingEnabled() {
         return Boolean.valueOf(getProperty(OdeConfigProperties.PROP_DB_LOGGING, "false"));
+    }
+    
+    // @hahnml
+    public String getTraDEURL() {
+        return getProperty(OdeConfigProperties.PROP_TraDE_URL,
+                "http://localhost:8080/api").trim();
+    }
+    
+    // @hahnml
+    public String getHostIP() {
+        return getProperty(OdeConfigProperties.PROP_HOST_IP,
+        "localhost").trim();
+    }
+    
+    // @hahnml
+    public String getDynamicContainerPort() {
+        return getProperty(OdeConfigProperties.PROP_DYNAMIC_CONTAINER_PORT,
+                "8080").trim();
     }
 
     public String getProperty(String pname) {

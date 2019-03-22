@@ -20,11 +20,13 @@ package org.apache.ode.bpel.runtime;
 
 import java.io.Serializable;
 import java.util.Collection;
-import java.util.Iterator;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.apache.ode.bpel.common.FaultException;
+import org.apache.ode.bpel.evar.ExternalVariableModuleException;
 import org.apache.ode.bpel.evt.ActivityEvent;
 import org.apache.ode.bpel.evt.EventContext;
 import org.apache.ode.bpel.evt.ScopeEvent;
@@ -35,8 +37,10 @@ import org.apache.ode.bpel.o.OConstants;
 import org.apache.ode.bpel.o.OLink;
 import org.apache.ode.bpel.o.OMessageVarType;
 import org.apache.ode.bpel.o.OMessageVarType.Part;
+import org.apache.ode.bpel.o.OScope;
 import org.apache.ode.jacob.IndexedObject;
-import org.apache.ode.bpel.evar.ExternalVariableModuleException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 
@@ -197,5 +201,73 @@ abstract class ACTIVITY extends BpelJacobRunnable implements IndexedObject {
         public String toString() {
             return type + "::" + aid;
         }
+    }
+    
+ // @hahnml: Set of general methods for notification based data retrieval
+    // from the TraDE Middleware
+
+    /**
+     * This method identifies and collects all variables of the underlying
+     * activity which are associated to a data model at the TraDE Middleware. To
+     * enable the identification of the correct data model instance at the
+     * middleware, the resulting map contains in addition corresponding
+     * correlation data.
+     * 
+     * @return A map of relevant activity variables and respective correlation
+     *         data associated to a data model at the TraDE Middleware.
+     */
+    public Map<OScope.Variable, CorrelationSetInstance> identifyTraDESupportedVariables() {
+        Map<OScope.Variable, CorrelationSetInstance> result = new HashMap<OScope.Variable, CorrelationSetInstance>();
+
+        Set<OScope.Variable> variables = identifyRelevantVariables();
+
+        for (OScope.Variable var : variables) {
+            if (isTraDESupportedVariable(var)) {
+                OScope.CorrelationSet cset = var.tradeAssociation.dataObjectRef.correlationSet;
+
+                VariableInstance varInst = _scopeFrame.resolve(var);
+                CorrelationSetInstance csetInst = _scopeFrame.resolve(cset);
+
+                if (varInst != null && csetInst != null) {
+                    // Add a new entry to the map
+                    result.put(var, csetInst);
+                }
+            }
+        }
+
+        return result;
+    }
+    
+    /**
+     * This method checks whether the referenced variable has a corresponding TraDE association or not. 
+     * 
+     * @param var to check for a TraDE association.
+     * 
+     * @return True, if the variable has a TraDE association. False, otherwise.
+     */
+    public boolean isTraDESupportedVariable(OScope.Variable var) {
+        boolean result = false;
+        
+        if (var.tradeAssociation != null
+                && var.tradeAssociation.dataObjectRef != null) {
+            result = true;
+        }
+        
+        return result;
+    }
+
+    /**
+     * This method provides a set of relevant variables from which the
+     * underlying activity implementation reads data.
+     * <p>
+     * Subclasses of ACTIVITY should override this method in order to resolve a
+     * corresponding list of relevant variables in the context of the individual
+     * activity implementations.
+     * 
+     * @return A set of relevant variables from which the underlying activity
+     *         implementation reads data.
+     */
+    protected Set<OScope.Variable> identifyRelevantVariables() {
+        return Collections.emptySet();
     }
 }

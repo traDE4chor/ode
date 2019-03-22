@@ -269,6 +269,15 @@ public class BpelObjectFactory {
         _mappings.put(ExtensibilityQNames.FAILURE_HANDLING_RETRY_DELAY, FailureHandling.RetryDelay.class);
         _mappings.put(ExtensibilityQNames.FAILURE_HANDLING_FAULT_ON, FailureHandling.FaultOnFailure.class);
         
+        // @hahnml: TraDE extensibility elements mappings
+        _mappings.put(ExtensibilityQNames.ASSOCIATION,
+                TraDEAssociation.class);
+        _mappings.put(ExtensibilityQNames.DATA_MODEL_REFERENCE,
+                TraDEDataModelRef.class);
+        _mappings.put(ExtensibilityQNames.DATA_OBJECT_REFEREBCE,
+                TraDEDataObjectRef.class);
+        _mappings.put(ExtensibilityQNames.TRIGGER,
+                TraDETrigger.class); 
     }
 
     public static BpelObjectFactory getInstance() {

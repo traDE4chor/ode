@@ -53,6 +53,7 @@ import org.apache.ode.bpel.runtime.channels.FaultData;
 import org.apache.ode.bpel.runtime.channels.InvokeResponseChannel;
 import org.apache.ode.bpel.runtime.channels.PickResponseChannel;
 import org.apache.ode.bpel.runtime.channels.TimerResponseChannel;
+import org.apache.ode.bpel.runtime.channels.DataNotificationChannel;
 import org.apache.ode.jacob.vpu.ExecutionQueueImpl;
 import org.apache.ode.jacob.vpu.JacobVPU;
 import org.w3c.dom.Element;
@@ -425,7 +426,7 @@ public class CoreBpelTest extends TestCase implements BpelRuntimeContext {
         return null;
     }
 
-    public Node readVariable(Long scopeInstanceId, String varname, boolean forWriting) throws FaultException {
+    public Node readVariable(Long scopeInstanceId, Variable variable, boolean forWriting) throws FaultException {
         // TODO Auto-generated method stub
         return null;
     }
@@ -488,5 +489,16 @@ public class CoreBpelTest extends TestCase implements BpelRuntimeContext {
     public ExtensionOperation createExtensionActivityImplementation(QName name) {
         // TODO Auto-generated method stub
         return null;
+    }
+    
+    public void registerNotification(
+            DataNotificationChannel dataNotificationChannel, Variable variable,
+            CorrelationSetInstance cset) {
+    }
+
+    public boolean isTradeDataAvailaibe(Variable variable,
+            CorrelationSetInstance cset) {
+        // TODO Auto-generated method stub
+        return false;
     }
 }

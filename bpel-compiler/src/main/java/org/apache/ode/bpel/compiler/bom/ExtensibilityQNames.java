@@ -51,5 +51,26 @@ public abstract class ExtensibilityQNames {
     public static final QName UNKNOWN_EA_FAULT_NAME = new QName(NS_BPEL_EXTENSIBILITY, "unknownExtensionImplementation");
     	
     public static final QName INVALID_EXTENSION_ELEMENT = new QName(NS_BPEL_EXTENSIBILITY, "invalidExtensionElement");
+    
+    
+    /*
+     * @hahnml: TraDE extensibility elements.
+     */
+    public static final String NS_TRADE_ASSOCIATION = "http://iaas.uni-stuttgart.de/trade/annotations";
+    public static final QName ASSOCIATION = new QName(
+            NS_TRADE_ASSOCIATION, "tradeAssociation");
+    public static final QName DATA_MODEL_REFERENCE = new QName(
+            NS_TRADE_ASSOCIATION, "dataModelRef");
+    public static final QName DATA_OBJECT_REFEREBCE = new QName(
+            NS_TRADE_ASSOCIATION, "dataObjectRef");
+    public static final QName TRIGGER = new QName(
+            NS_TRADE_ASSOCIATION, "trigger");
+    public static final String ATTR_DATA_MODEL_NAMESPACE = "dataModelNamespace";
+    public static final String ATTR_DATA_MODEL_NAME = "dataModelName";
+    public static final String ATTR_DATA_OBJ_NAME = "dataObjectName";
+    public static final String ATTR_DATA_ELEMENT_NAME = "dataElementName";
+    public static final String ATTR_CORRELATION_SET = "correlationSet";
+    public static final String ATTR_VARIABLE = "variable";
+    public static final String ATTR_TRIGGER_SYNC_METHOD = "syncMethod";
 }
 

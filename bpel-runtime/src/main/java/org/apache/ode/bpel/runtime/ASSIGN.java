@@ -20,10 +20,17 @@ package org.apache.ode.bpel.runtime;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collection;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.xml.namespace.QName;
 
@@ -31,6 +38,7 @@ import org.apache.ode.bpel.common.FaultException;
 import org.apache.ode.bpel.compiler.bom.ExtensibilityQNames;
 import org.apache.ode.bpel.eapi.ExtensionContext;
 import org.apache.ode.bpel.eapi.ExtensionOperation;
+import org.apache.ode.bpel.elang.xpath10.o.OXPath10Expression;
 import org.apache.ode.bpel.evar.ExternalVariableModuleException;
 import org.apache.ode.bpel.evt.PartnerLinkModificationEvent;
 import org.apache.ode.bpel.evt.ScopeEvent;
@@ -40,6 +48,7 @@ import org.apache.ode.bpel.explang.EvaluationException;
 import org.apache.ode.bpel.o.OAssign;
 import org.apache.ode.bpel.o.OAssign.DirectRef;
 import org.apache.ode.bpel.o.OAssign.LValueExpression;
+import org.apache.ode.bpel.o.OAssign.OAssignOperation;
 import org.apache.ode.bpel.o.OAssign.PropertyRef;
 import org.apache.ode.bpel.o.OAssign.VariableRef;
 import org.apache.ode.bpel.o.OElementVarType;
@@ -50,6 +59,8 @@ import org.apache.ode.bpel.o.OMessageVarType.Part;
 import org.apache.ode.bpel.o.OProcess.OProperty;
 import org.apache.ode.bpel.o.OScope;
 import org.apache.ode.bpel.o.OScope.Variable;
+import org.apache.ode.bpel.runtime.channels.DataNotificationChannel;
+import org.apache.ode.bpel.runtime.channels.DataNotificationChannelListener;
 import org.apache.ode.bpel.runtime.channels.FaultData;
 import org.apache.ode.utils.DOMUtils;
 import org.apache.ode.utils.Namespaces;
@@ -75,6 +86,29 @@ class ASSIGN extends ACTIVITY {
 	private static final long serialVersionUID = 1L;
 
 	private static final Logger __log = LoggerFactory.getLogger(ASSIGN.class);
+	
+	// @hahnml: Flag to prevent re-initialization of variables
+    private boolean _firstTime = true;
+	
+	// @hahnml: We have to keep track of the remaining operations we have to
+    // process.
+    /** Remaining assign operations. */
+    private List<OAssign.OAssignOperation> _remainingAssignOps = new ArrayList<OAssign.OAssignOperation>();
+
+    // @hahnml: We have to keep track of the registered notifications and their
+    // state by mapping an counter to a variable name. We use an atomic integer
+    // to count outstanding notifications we have
+    // to wait for before starting the execution of the ASSIGN copy operations
+    /** Variables for which a notification was already registered. */
+    private Map<String, AtomicInteger> _registeredNotifications = new HashMap<String, AtomicInteger>();
+
+    // @hahnml: We have to identify the set of variables that are associated
+    // with a data element at the TraDE Middleware. In this case only variables
+    // read from are relevant since there we have to wait until a corresponding
+    // value can be retrieved from the middleware in order to start processing
+    // the related assignment opertation.
+    /** Variables associated with a data element at the TraDE Middleware. */
+    private Map<OScope.Variable, CorrelationSetInstance> _tradeVars = new HashMap<OScope.Variable, CorrelationSetInstance>();
 
 	private static final ASSIGNMessages __msgs = MessageBundle
 			.getMessages(ASSIGNMessages.class);
@@ -84,23 +118,104 @@ class ASSIGN extends ACTIVITY {
 	}
 
 	public void run() {
-		OAssign oassign = getOAsssign();
-
+	    if (_firstTime) {
+    	    // @hahnml: Resolve the TraDE supported variables
+            _tradeVars = identifyTraDESupportedVariables();
+    
+            // @hahnml: Initialize the remaining list
+            _remainingAssignOps.addAll(getOAssign().operations);
+            
+            _firstTime = false;
+	    }
+        
 		FaultData faultData = null;
 
-		for (OAssign.OAssignOperation operation : oassign.operations) {
+		Iterator<OAssign.OAssignOperation> iter = _remainingAssignOps
+                .iterator();
+        boolean proceed = true;
+        while (iter.hasNext() && proceed) {
+            OAssign.OAssignOperation operation = iter.next();
+            
 			try {
 				if (operation instanceof OAssign.Copy) {
-					copy((OAssign.Copy) operation);
+				    OAssign.Copy ocopy = (OAssign.Copy) operation;
+
+                    // @hahnml: Get all variables that are associated with the
+                    // TraDE Middlware
+                    Set<OScope.Variable> vars = resolveTraDESupportedVariables(ocopy);
+                    // Check if the copy reads from such a variable
+                    if (vars != null
+                            && vars.size() > 0
+                            && (isNotificationPending(vars) || shouldRegisterNotifications(vars))) {
+                        if (shouldRegisterNotifications(vars)) {
+                            // Remember the variables for which notifications
+                            // were registered
+                            for (OScope.Variable var : vars) {
+                                _registeredNotifications.put(var.name,
+                                        new AtomicInteger(0));
+                            }
+
+                            // If so, register a corresponding notification and
+                            // wait until the data is available.
+                            // Stop processing copy operations if one or more
+                            // notifications are created since the later
+                            // ones might depend on the result from the current
+                            // copy
+                            // operation which cannot be executed at the moment.
+                            int notificationCount = createDataNotificationChannels(vars);
+                            if (notificationCount > 0) {
+                                proceed = false;
+                            } else {
+                                // Execute the copy statement
+                                copy(ocopy);
+
+                                // @hahnml: Remove the processed copy operation
+                                // from the
+                                // list of remaining operations
+                                iter.remove();
+
+                                // @hahnml: Remove the variables for which
+                                // notifications
+                                // were registered before
+                                for (OScope.Variable var : vars) {
+                                    _registeredNotifications.remove(var.name);
+                                }
+                            }
+                        } else {
+                            // Stop processing copy operations since the later
+                            // ones might depend on the result from the current
+                            // copy
+                            // operation which cannot be executed at the moment.
+                            proceed = false;
+                        }
+                    } else {
+                        copy(ocopy);
+
+                        // @hahnml: Remove the processed copy operation from the
+                        // list of remaining operations
+                        iter.remove();
+
+                        // @hahnml: Remove the variables for which notifications
+                        // were registered before
+                        if (vars != null && !vars.isEmpty()) {
+                            for (OScope.Variable var : vars) {
+                                _registeredNotifications.remove(var.name);
+                            }
+                        }
+                    }
 				} else if (operation instanceof OAssign.ExtensionAssignOperation) {
 					invokeExtensionAssignOperation((OAssign.ExtensionAssignOperation) operation);
+					
+					// @hahnml: Remove the processed extension operation from
+                    // the list of remaining operations
+                    iter.remove();
 				}
 			} catch (FaultException fault) {
 				if (operation instanceof OAssign.Copy) {
 					if (((OAssign.Copy) operation).ignoreMissingFromData) {
 						if (fault
 								.getQName()
-								.equals(getOAsssign().getOwner().constants.qnSelectionFailure)
+								.equals(getOAssign().getOwner().constants.qnSelectionFailure)
 								&& (fault.getCause() != null && "ignoreMissingFromData"
 										.equals(fault.getCause().getMessage()))) {
 							continue;
@@ -109,7 +224,7 @@ class ASSIGN extends ACTIVITY {
 					if (((OAssign.Copy) operation).ignoreUninitializedFromVariable) {
 						if (fault
 								.getQName()
-								.equals(getOAsssign().getOwner().constants.qnUninitializedVariable)
+								.equals(getOAssign().getOwner().constants.qnUninitializedVariable)
 								&& (fault.getCause() == null || !"throwUninitializedToVariable"
 										.equals(fault.getCause().getMessage()))) {
 							continue;
@@ -132,7 +247,13 @@ class ASSIGN extends ACTIVITY {
 					+ ",faultExplanation=" + faultData.getExplanation());
 			_self.parent.completed(faultData, CompensationHandler.emptySet());
 		} else {
-			_self.parent.completed(null, CompensationHandler.emptySet());
+		    // @hahnml: Only complete if we do not wait for outstanding
+            // notifications
+            // (_notificationCount > 0), i.e., all required data is available.
+            if (_registeredNotifications.isEmpty()) {
+                // Waiting
+                _self.parent.completed(null, CompensationHandler.emptySet());
+            }
 		}
 	}
 
@@ -140,7 +261,7 @@ class ASSIGN extends ACTIVITY {
 		return __log;
 	}
 
-	private OAssign getOAsssign() {
+	private OAssign getOAssign() {
 		return (OAssign) _self.o;
 	}
 
@@ -156,7 +277,7 @@ class ASSIGN extends ACTIVITY {
 				__log.error("iid: " + getBpelRuntimeContext().getPid()
 						+ " error evaluating lvalue");
 				throw new FaultException(
-						getOAsssign().getOwner().constants.qnSelectionFailure,
+						getOAssign().getOwner().constants.qnSelectionFailure,
 						e.getMessage());
 			}
 			if (lvar == null) {
@@ -165,7 +286,7 @@ class ASSIGN extends ACTIVITY {
 				if (__log.isDebugEnabled())
 					__log.debug(to + ": " + msg);
 				throw new FaultException(
-						getOAsssign().getOwner().constants.qnSelectionFailure,
+						getOAssign().getOwner().constants.qnSelectionFailure,
 						msg);
 			}
 			if (!napi.isVariableInitialized(lvar)) {
@@ -289,7 +410,7 @@ class ASSIGN extends ACTIVITY {
 				if (e.getCause() instanceof FaultException)
 					throw (FaultException) e.getCause();
 				throw new FaultException(
-						getOAsssign().getOwner().constants.qnSelectionFailure,
+						getOAssign().getOwner().constants.qnSelectionFailure,
 						msg);
 			}
 			if (l.size() == 0) {
@@ -297,7 +418,7 @@ class ASSIGN extends ACTIVITY {
 				if (__log.isDebugEnabled())
 					__log.debug(from + ": " + msg);
 				throw new FaultException(
-						getOAsssign().getOwner().constants.qnSelectionFailure,
+						getOAssign().getOwner().constants.qnSelectionFailure,
 						msg, new Throwable("ignoreMissingFromData"));
 			} else if (l.size() > 1) {
 				String msg = __msgs.msgRValueMultipleNodesSelected(expr
@@ -305,7 +426,7 @@ class ASSIGN extends ACTIVITY {
 				if (__log.isDebugEnabled())
 					__log.debug(from + ": " + msg);
 				throw new FaultException(
-						getOAsssign().getOwner().constants.qnSelectionFailure,
+						getOAssign().getOwner().constants.qnSelectionFailure,
 						msg);
 			}
 			retVal = (Node) l.get(0);
@@ -343,7 +464,7 @@ class ASSIGN extends ACTIVITY {
 						if (__log.isDebugEnabled())
 							__log.debug(from + ": " + msg);
 						throw new FaultException(
-								getOAsssign().getOwner().constants.qnSelectionFailure,
+								getOAssign().getOwner().constants.qnSelectionFailure,
 								msg);
 
 					}
@@ -358,7 +479,7 @@ class ASSIGN extends ACTIVITY {
 						if (__log.isDebugEnabled())
 							__log.debug(from + ": " + msg);
 						throw new FaultException(
-								getOAsssign().getOwner().constants.qnSelectionFailure,
+								getOAssign().getOwner().constants.qnSelectionFailure,
 								msg);
 
 					}
@@ -372,7 +493,7 @@ class ASSIGN extends ACTIVITY {
 				if (__log.isDebugEnabled())
 					__log.debug(from + ": " + msg);
 				throw new FaultException(
-						getOAsssign().getOwner().constants.qnSelectionFailure,
+						getOAssign().getOwner().constants.qnSelectionFailure,
 						msg);
 			}
 		} else {
@@ -381,7 +502,7 @@ class ASSIGN extends ACTIVITY {
 			if (__log.isErrorEnabled())
 				__log.error(from + ": " + msg);
 			throw new FaultException(
-					getOAsssign().getOwner().constants.qnSelectionFailure, msg);
+					getOAssign().getOwner().constants.qnSelectionFailure, msg);
 		}
 
 		// Now verify we got something.
@@ -390,7 +511,7 @@ class ASSIGN extends ACTIVITY {
 			if (__log.isDebugEnabled())
 				__log.debug(from + ": " + msg);
 			throw new FaultException(
-					getOAsssign().getOwner().constants.qnSelectionFailure, msg);
+					getOAssign().getOwner().constants.qnSelectionFailure, msg);
 		}
 
 		// Now check that we got the right thing.
@@ -406,7 +527,7 @@ class ASSIGN extends ACTIVITY {
 				__log.debug(from + ": " + msg);
 
 			throw new FaultException(
-					getOAsssign().getOwner().constants.qnSelectionFailure, msg);
+					getOAssign().getOwner().constants.qnSelectionFailure, msg);
 
 		}
 
@@ -694,7 +815,7 @@ class ASSIGN extends ACTIVITY {
 			if (__log.isDebugEnabled())
 				__log.debug(lvaluePtr + ": " + msg);
 			throw new FaultException(
-					getOAsssign().getOwner().constants.qnSelectionFailure, msg);
+					getOAssign().getOwner().constants.qnSelectionFailure, msg);
 		}
 
 		return lvalue;
@@ -741,7 +862,7 @@ class ASSIGN extends ACTIVITY {
 				if (e.getCause() instanceof FaultException)
 					throw (FaultException) e.getCause();
 				throw new FaultException(
-						getOAsssign().getOwner().constants.qnSubLanguageExecutionFault,
+						getOAssign().getOwner().constants.qnSubLanguageExecutionFault,
 						msg);
 			}
 		}
@@ -894,4 +1015,169 @@ class ASSIGN extends ACTIVITY {
 		}
 	}
 
+	// @hahnml: TraDE-specific extensions
+	private int createDataNotificationChannels(Set<OScope.Variable> variables) {
+        // Count the created notifications so that we know if we need to wait
+        // for them or not
+        int createdNotifications = 0;
+
+        for (OScope.Variable variable : variables) {
+            // Check if the data is already accessible and we should register a
+            // notification or not
+            if (!getBpelRuntimeContext().isTradeDataAvailaibe(variable,
+                    _tradeVars.get(variable))) {
+                // Data required by the activity is not available, register a
+                // notification channel
+                DataNotificationChannel signal = newChannel(DataNotificationChannel.class);
+
+                object(false, new DataNotificationChannelListener(signal) {
+                    private static final long serialVersionUID = -5000311966260939664L;
+
+                    public void onNotification(String variableName) {
+                        // Decrement our notification counter for the received
+                        // notification
+                        if (_registeredNotifications.containsKey(variableName)) {
+                            _registeredNotifications.get(variableName)
+                                    .getAndDecrement();
+                        }
+
+                        // Try to execute the remaining operations and complete
+                        // the
+                        // ASSIGN
+                        ASSIGN.this.run();
+                    }
+
+                    public void onCancel(String variableName) {
+                        // Decrement our notification counter for the received
+                        // notification
+                        if (_registeredNotifications.containsKey(variableName)) {
+                            _registeredNotifications.get(variableName)
+                                    .getAndDecrement();
+                        }
+
+                        // Also try to execute the activity to let it fault if
+                        // for
+                        // one or more variables no data is available but their
+                        // notifications are canceled
+                        ASSIGN.this.run();
+                    }
+                });
+                
+                // Increment the counter for the variable
+                _registeredNotifications.get(variable.name).getAndIncrement();
+
+                // Register the notification at the runtime context
+                getBpelRuntimeContext().registerNotification(signal, variable,
+                        _tradeVars.get(variable));
+
+                createdNotifications++;
+            }
+        }
+
+        return createdNotifications;
+    }
+
+    /*
+     * (non-Javadoc)
+     * 
+     * @see org.apache.ode.bpel.runtime.ACTIVITY#identifyRelevantVariables()
+     * 
+     * In the context of an ASSIGN activity the following group of variables is
+     * relevant: 1. Only variables the ASSIGN reads from 2. Only element and
+     * type-based variables, no message, etc. variables since they will not be
+     * linked to the TraDE Middleware. 3. ?
+     */
+    @Override
+    protected Set<OScope.Variable> identifyRelevantVariables() {
+        Set<OScope.Variable> result = new HashSet<OScope.Variable>();
+
+        OAssign assign = (OAssign) _self.o;
+
+        // Check all copy operations for relevant variables
+        for (OAssignOperation operation : assign.operations) {
+            if (operation instanceof OAssign.Copy) {
+                OAssign.Copy copy = (OAssign.Copy) operation;
+
+                result.addAll(identifyRelevantVariables(copy));
+            }
+        }
+
+        return result;
+    }
+
+    private Set<OScope.Variable> identifyRelevantVariables(OAssign.Copy copy) {
+        Set<OScope.Variable> result = new HashSet<OScope.Variable>();
+
+        // We are only interested in the left part (variables to
+        // read from)
+
+        // If the copy from is a VariableRef we can directly resolve the
+        // variable
+        if (copy.from instanceof VariableRef) {
+            // ... but we ignore variables holding a message
+            if (!((VariableRef) copy.from).isMessageVariableRef()) {
+                result.add(((VariableRef) copy.from).getVariable());
+            }
+        } else {
+            // We have to check the conventional Assignment logic to
+            // resolve relevant variables.
+            if (copy.from instanceof OAssign.PropertyRef) {
+                OAssign.PropertyRef propRef = (OAssign.PropertyRef) copy.from;
+
+                result.add(propRef.variable);
+            } else if (copy.from instanceof OAssign.Expression) {
+                OAssign.Expression expr = (OAssign.Expression) copy.from;
+
+                if (expr.expression instanceof OXPath10Expression) {
+                    OXPath10Expression exp = (OXPath10Expression) expr.expression;
+
+                    Collection<OScope.Variable> varRefs = exp.vars.values();
+
+                    result.addAll(varRefs);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private Set<OScope.Variable> resolveTraDESupportedVariables(
+            OAssign.Copy copy) {
+        Set<OScope.Variable> vars = new HashSet<OScope.Variable>();
+
+        for (OScope.Variable var : identifyRelevantVariables(copy)) {
+            // If the variable is supported by the TraDE Middlware, we return
+            // true since the whole copy statement has to wait for the data.
+            if (isTraDESupportedVariable(var)) {
+                vars.add(var);
+            }
+        }
+
+        return vars;
+    }
+
+    private boolean isNotificationPending(Set<Variable> vars) {
+        boolean result = false;
+
+        for (OScope.Variable var : vars) {
+            if (_registeredNotifications.containsKey(var.name)) {
+                result = result
+                        || _registeredNotifications.get(var.name).get() > 0;
+            }
+        }
+
+        return result;
+    }
+
+    private boolean shouldRegisterNotifications(Set<Variable> vars) {
+        boolean result = true;
+
+        for (OScope.Variable var : vars) {
+            if (_registeredNotifications.containsKey(var.name)) {
+                result = false;
+            }
+        }
+
+        return result;
+    }
 }

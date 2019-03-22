@@ -28,6 +28,7 @@ import org.apache.ode.bpel.dao.CorrelationSetDAO;
 import org.apache.ode.bpel.dao.CorrelatorDAO;
 import org.apache.ode.bpel.dao.FaultDAO;
 import org.apache.ode.bpel.dao.MessageExchangeDAO;
+import org.apache.ode.bpel.dao.NotificationDAO;
 import org.apache.ode.bpel.dao.ProcessDAO;
 import org.apache.ode.bpel.dao.ProcessInstanceDAO;
 import org.apache.ode.bpel.dao.ScopeDAO;
@@ -125,6 +126,11 @@ public class ProcessInstanceDAOImpl extends OpenJPADAO implements ProcessInstanc
     @SuppressWarnings("unused")
     private Collection<MessageExchangeDAO> _messageExchanges = new ArrayList<MessageExchangeDAO>();
     
+    // @hahnml:
+    @OneToMany(targetEntity = NotificationDAOImpl.class, mappedBy = "_processInst", fetch = FetchType.LAZY, cascade = {
+            CascadeType.MERGE, CascadeType.PERSIST, CascadeType.REFRESH })
+    private Collection<NotificationDAO> _notifications = new ArrayList<NotificationDAO>();
+    
     private transient int _activityFailureCount = -1;
     
     public ProcessInstanceDAOImpl() {}
@@ -199,7 +205,19 @@ public class ProcessInstanceDAOImpl extends OpenJPADAO implements ProcessInstanc
         if( _fault != null ) {
             getEM().remove(_fault);
         }
+        
+        // @hahnml: Remove the notification entries
+        if (_notifications != null) {
+            deleteNotifications();
+        }
+        
         getEM().remove(this); // This deletes ActivityRecoveryDAO 
+    }
+    
+    private void deleteNotifications() {
+        getEM().createNamedQuery(
+                NotificationDAOImpl.DELETE_NOTIFICATIONS_BY_INSTANCE)
+                .setParameter("instance", this).executeUpdate();
     }
     
     @SuppressWarnings("unchecked")
@@ -410,4 +428,39 @@ public class ProcessInstanceDAOImpl extends OpenJPADAO implements ProcessInstanc
         }
         return c;
     }    
+    
+    public NotificationDAO createNotificationDAO(String dataContainerName,
+            String notificationID, String tradeNotificationID,
+            String notificationChannelID) {
+        NotificationDAOImpl ret = new NotificationDAOImpl(dataContainerName,
+                notificationID, tradeNotificationID, notificationChannelID,
+                this);
+        _notifications.add(ret);
+
+        // Must persist the link to generate a notification ID
+        getEM().persist(ret);
+        return ret;
+    }
+
+    public NotificationDAO getNotification(String notificationID) {
+        for (NotificationDAO notif : _notifications) {
+            if (notif.getNotificationID().equals(notificationID))
+                return notif;
+        }
+
+        return null;
+    }
+
+    public Collection<NotificationDAO> getNotifications() {
+        return _notifications;
+    }
+
+    public void deleteNotificationDAO(NotificationDAO notification) {
+        if (notification != null) {
+            NotificationDAOImpl toRemove = (NotificationDAOImpl) notification;
+
+            getEM().remove(toRemove);
+            _notifications.remove(toRemove);
+        }
+    }
 }

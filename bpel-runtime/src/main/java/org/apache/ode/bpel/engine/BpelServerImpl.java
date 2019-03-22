@@ -111,6 +111,11 @@ public class BpelServerImpl implements BpelServer, Scheduler.JobProcessor {
     private int _migrationTransactionTimeout;
     private Thread processDefReaper;
     
+    // @hahnml
+    private String _tradeMiddlewareURL;
+    private String _hostIP;
+    private String _dynamicContainerPort;
+    
     BpelEngineImpl _engine;
     protected BpelDatabase _db;
     
@@ -263,7 +268,7 @@ public class BpelServerImpl implements BpelServer, Scheduler.JobProcessor {
 
     // enable extensibility
     protected BpelEngineImpl createBpelEngineImpl(Contexts contexts) {
-        return new BpelEngineImpl(contexts);
+        return new BpelEngineImpl(contexts, _tradeMiddlewareURL, _hostIP, _dynamicContainerPort);
     }
     
     public void shutdown() throws BpelEngineException {
@@ -700,4 +705,16 @@ public class BpelServerImpl implements BpelServer, Scheduler.JobProcessor {
 	public void setMigrationTransactionTimeout(int migrationTransactionTimeout) {
 		this._migrationTransactionTimeout = migrationTransactionTimeout;
 	}
+
+    public void setTraDE_Middleware_URL(String traDEURL) {
+        this._tradeMiddlewareURL = traDEURL;        
+    }
+
+    public void setHostIp(String hostIP) {
+        this._hostIP = hostIP;     
+    }
+
+    public void setDynamicContainerPort(String dynamicContainerPort) {
+        this._dynamicContainerPort = dynamicContainerPort;
+    }
 }

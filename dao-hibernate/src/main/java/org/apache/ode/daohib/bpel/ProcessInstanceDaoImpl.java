@@ -70,6 +70,7 @@ import org.hibernate.Query;
 import org.hibernate.criterion.Projections;
 import org.hibernate.criterion.Restrictions;
 import org.w3c.dom.Element;
+import org.apache.ode.bpel.dao.NotificationDAO;
 
 /**
  * Hibernate-based {@link ProcessInstanceDAO} implementation.
@@ -562,13 +563,35 @@ public class ProcessInstanceDaoImpl extends HibernateDao implements ProcessInsta
       entering("ProcessInstanceDaoImpl.getConnection");
     return new BpelDAOConnectionImpl(_sm);
   }
+  
+  public Collection<String> getMessageExchangeIds() {
+      Collection<String> c = new HashSet<String>();
+      for (HMessageExchange m : _instance.getMessageExchanges()) {
+          c.add(m.getId().toString());
+      }
+      return c;
+  }
  
-   public Collection<String> getMessageExchangeIds() {
-        Collection<String> c = new HashSet<String>();
-        for (HMessageExchange m : _instance.getMessageExchanges()) {
-            c.add(m.getId().toString());
-        }
-        return c;
-    }
+  public NotificationDAO createNotificationDAO(String dataContainerName,
+          String notificationID, String tradeNotificationID,
+          String notificationChannelID) {
+      // TODO Auto-generated method stub
+      return null;
+  }
 
+  public NotificationDAO getNotification(String notificationID) {
+      // TODO Auto-generated method stub
+      return null;
+  }
+
+  public Collection<NotificationDAO> getNotifications() {
+      // TODO Auto-generated method stub
+      return null;
+  }
+
+  public void deleteNotificationDAO(NotificationDAO notification) {
+      // TODO Auto-generated method stub
+      
+  }
+  
 }

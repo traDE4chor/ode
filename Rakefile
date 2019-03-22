@@ -102,13 +102,13 @@ define "ode" do
     libs = projects("axis2", "bpel-api", "bpel-compiler", "bpel-connector", "bpel-dao",
       "bpel-epr", "bpel-obj", "bpel-ql", "bpel-runtime", "scheduler-simple",
       "bpel-schemas", "bpel-store", "dao-hibernate", "jacob", "jca-ra", "jca-server",
-      "utils", "dao-jpa", "agents", "bpel-rest-extensions"),
+      "utils", "dao-jpa", "agents", "bpel-rest-extensions", "trade-api-client"),
       AXIS2_ALL, ANNONGEN, BACKPORT, COMMONS.codec, COMMONS.collections, COMMONS.fileupload, COMMONS.io, COMMONS.httpclient, COMMONS.beanutils,
       COMMONS.lang, COMMONS.pool, DERBY, DERBY_TOOLS, JAXEN, JAVAX.activation, JAVAX.ejb, JAVAX.javamail,
       JAVAX.connector, JAVAX.jms, JAVAX.persistence, JAVAX.transaction, JAVAX.stream,  JIBX,
       GERONIMO.connector, GERONIMO.kernel, GERONIMO.transaction, LOG4J2, OPENJPA, SAXON, TRANQL,
       WOODSTOX, WSDL4J, WS_COMMONS, XALAN, XERCES, XMLBEANS, SPRING,
-      AXIS2_MODULES.libs, H2::REQUIRES, SLF4J, ODE_WEB_CONSOLE, TUCKEY_URLREWRITE
+      AXIS2_MODULES.libs, H2::REQUIRES, SLF4J, ODE_WEB_CONSOLE, TUCKEY_URLREWRITE, TRADE_API
 
 
     package(:war).with(:libs=>libs).path("WEB-INF").tap do |web_inf|
@@ -243,7 +243,7 @@ define "ode" do
   define "bpel-runtime" do
 
     compile.with projects("bpel-api", "bpel-compiler", "bpel-dao", "bpel-epr", "bpel-obj", "bpel-schemas",
-      "bpel-store", "jacob", "jacob-ap", "utils", "agents"),
+      "bpel-store", "jacob", "jacob-ap", "utils", "agents", "trade-api-client"),
        COMMONS.collections, COMMONS.httpclient, JAXEN, JAVAX.persistence, JAVAX.stream, SAXON, WSDL4J, XMLBEANS,
       SPRING, SLF4J
 
@@ -510,6 +510,12 @@ define "ode" do
   desc "OpenTOSCA BPEL REST Extensions"
   define "bpel-rest-extensions" do
     compile.with projects("bpel-api", "bpel-obj", "bpel-runtime", "utils"), COMMONS.codec, COMMONS.httpclient, SLF4J, LOG4J2
+    package :jar
+  end
+
+  desc "TraDE Middleware Client"
+  define "trade-api-client" do
+    compile.with COMMONS.io, SLF4J, LOG4J2, TRADE_API
     package :jar
   end
 

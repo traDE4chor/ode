@@ -36,6 +36,7 @@
         <class>org.apache.ode.dao.jpa.ProcessInstanceDAOImpl</class>
         <class>org.apache.ode.dao.jpa.ScopeDAOImpl</class>
         <class>org.apache.ode.dao.jpa.XmlDataDAOImpl</class>
+        <class>org.apache.ode.dao.jpa.NotificationDAOImpl</class>
 
         <properties>
             <!-- Properties for an embedded Derby connection 

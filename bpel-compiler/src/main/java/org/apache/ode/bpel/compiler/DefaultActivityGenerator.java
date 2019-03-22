@@ -22,8 +22,13 @@ import org.apache.ode.bpel.compiler.api.CompilerContext;
 import org.apache.ode.bpel.compiler.bom.BpelObject;
 import org.apache.ode.bpel.compiler.bom.ExtensibilityQNames;
 import org.apache.ode.bpel.compiler.bom.FailureHandling;
+import org.apache.ode.bpel.compiler.bom.TraDEAssociation;
 import org.apache.ode.bpel.o.OActivity;
 import org.apache.ode.bpel.o.OFailureHandling;
+import org.apache.ode.bpel.o.OScope;
+import org.apache.ode.bpel.o.OTraDEAssociation;
+import org.apache.ode.bpel.o.OTraDEAssociation.ODataObjectRef;
+import org.apache.ode.bpel.o.OTraDEAssociation.OTrigger;
 import org.w3c.dom.Element;
 
 /**
@@ -36,9 +41,12 @@ abstract class DefaultActivityGenerator implements ActivityGenerator {
         _context = context;
     }
 
-    static void defaultExtensibilityElements(OActivity output, BpelObject src) {
+    static void defaultExtensibilityElements(CompilerContext context, OActivity output, BpelObject src) {
         if (src != null) {
             failureHandlinExtensibilityElement(output, src);
+            
+            // @hahnml: Handle TraDE Association: Trigger
+            tradeAssociationExtensibilityElement(context, output, src);
         }
     }
 
@@ -55,4 +63,48 @@ abstract class DefaultActivityGenerator implements ActivityGenerator {
         output.setFailureHandling(obj);
     }
 
+    static private void tradeAssociationExtensibilityElement(CompilerContext context, OActivity output,
+            BpelObject src) {
+        // @hahnml: TraDE association extensibility element.
+        Element element = src
+                .getExtensibilityElement(ExtensibilityQNames.ASSOCIATION);
+        if (element == null)
+            return;
+        TraDEAssociation extElement = new TraDEAssociation(element);
+
+        // Check if a trigger is specified
+        if (extElement.getTrigger() == null)
+            return;
+
+        OTraDEAssociation obj = new OTraDEAssociation();
+        OTraDEAssociation.OTrigger trigger = new OTrigger();
+
+        trigger.synchronizationMethod = extElement.getTrigger()
+                .getSynchronizationMethod();
+        
+        if (extElement.getTrigger().getVariable() == null)
+            return;
+        
+        OScope.Variable var = context.resolveVariable(extElement.getTrigger().getVariable());
+        trigger.variable = var;
+
+        // Check if a data object reference is specified
+        if (extElement.getTrigger().getDataObjectRef() == null)
+            return;
+        
+        OTraDEAssociation.ODataObjectRef objectRef = new ODataObjectRef();
+        objectRef.dataObjectName = extElement.getTrigger().getDataObjectRef()
+                .getDataObjectName();
+        objectRef.dataElementName = extElement.getTrigger().getDataObjectRef()
+                .getDataElementName();
+
+        OScope.CorrelationSet cset = context.resolveCorrelationSet(extElement.getTrigger().getDataObjectRef()
+                .getCorrelationSet());
+        objectRef.correlationSet = cset;
+        
+        trigger.dataObjectRef = objectRef;
+
+        obj.trigger = trigger;
+        output.setTraDEAssociation(obj);
+    }
 }

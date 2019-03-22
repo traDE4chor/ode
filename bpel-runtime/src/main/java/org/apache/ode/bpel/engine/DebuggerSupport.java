@@ -386,6 +386,14 @@ public class DebuggerSupport implements DebuggerContext {
 
                     onEvent(evt);
                     onEvent(terminationEvent);
+                    
+                    // @hahnml: In order to clean-up unresolved notifications,
+                    // we schedule a corresponding job that takes care of it.
+                    JobDetails we = new JobDetails();
+                    we.setType(JobType.TERMINATE);
+                    we.setInstanceId(iid);
+                    _process._engine._contexts.scheduler.schedulePersistedJob(
+                            we, null);
 
                     return null;
                 }
@@ -408,5 +416,47 @@ public class DebuggerSupport implements DebuggerContext {
      */
     public Object getProcessModel() {
     	return _process.getOProcess();
+    }
+    
+    public void handleIncomingNotification(final Long iid,
+            final String dataContainerName, final String notificationID) {
+        try {
+            _db.exec(new BpelDatabase.Callable<Object>() {
+                public Boolean run(BpelDAOConnection conn) throws Exception {
+                    ProcessInstanceDAO instance = conn.getInstance(iid);
+
+                    if (instance == null) {
+                        throw new InstanceNotFoundException("" + iid);
+                    }
+                    if (ProcessState.canExecute(instance.getState())) {
+                        JobDetails we = new JobDetails();
+                        we.setType(JobType.DATA_NOTIFICATION);
+                        we.setInstanceId(iid);
+                        we.setProcessId(instance.getProcess().getProcessId());
+
+                        we.getDetailsExt().put(
+                                JobDetails.TARGET_DATA_CONTAINER,
+                                dataContainerName);
+
+                        we.getDetailsExt().put(JobDetails.DATA_NOTIFICATION_ID,
+                                notificationID);
+
+                        _process._engine._contexts.scheduler
+                                .schedulePersistedJob(we, null);
+
+                        return true;
+
+                    }
+                    return false;
+
+                }
+            });
+
+        } catch (ManagementException me) {
+            throw me;
+        } catch (Exception ex) {
+            __log.error("DbError", ex);
+            throw new RuntimeException(ex);
+        }
     }
 }

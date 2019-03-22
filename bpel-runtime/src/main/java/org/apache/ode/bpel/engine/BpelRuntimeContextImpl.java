@@ -26,6 +26,7 @@ import java.util.Calendar;
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
+import java.util.UUID;
 
 import javax.wsdl.Fault;
 import javax.wsdl.Operation;
@@ -40,6 +41,7 @@ import org.apache.ode.bpel.dao.CorrelatorDAO;
 import org.apache.ode.bpel.dao.MessageDAO;
 import org.apache.ode.bpel.dao.MessageExchangeDAO;
 import org.apache.ode.bpel.dao.MessageRouteDAO;
+import org.apache.ode.bpel.dao.NotificationDAO;
 import org.apache.ode.bpel.dao.PartnerLinkDAO;
 import org.apache.ode.bpel.dao.ProcessDAO;
 import org.apache.ode.bpel.dao.ProcessInstanceDAO;
@@ -60,6 +62,7 @@ import org.apache.ode.bpel.evt.ScopeCompletionEvent;
 import org.apache.ode.bpel.evt.ScopeEvent;
 import org.apache.ode.bpel.evt.ScopeFaultEvent;
 import org.apache.ode.bpel.evt.ScopeStartEvent;
+import org.apache.ode.bpel.extensions.trade.TraDEManager;
 import org.apache.ode.bpel.iapi.BpelEngineException;
 import org.apache.ode.bpel.iapi.ContextException;
 import org.apache.ode.bpel.iapi.Endpoint;
@@ -92,6 +95,7 @@ import org.apache.ode.bpel.runtime.ScopeFrame;
 import org.apache.ode.bpel.runtime.Selector;
 import org.apache.ode.bpel.runtime.VariableInstance;
 import org.apache.ode.bpel.runtime.channels.ActivityRecoveryChannel;
+import org.apache.ode.bpel.runtime.channels.DataNotificationChannel;
 import org.apache.ode.bpel.runtime.channels.FaultData;
 import org.apache.ode.bpel.runtime.channels.InvokeResponseChannel;
 import org.apache.ode.bpel.runtime.channels.PickResponseChannel;
@@ -138,6 +142,9 @@ public class BpelRuntimeContextImpl implements BpelRuntimeContext {
 
     /** Five second maximum for continous execution. */
     private long _maxReductionTimeMs = 2000000;
+    
+    // @hahnml: Helper class for TraDE integration
+    private TraDEManager _tradeManager;
 
     public BpelRuntimeContextImpl(BpelProcess bpelProcess, ProcessInstanceDAO dao, PROCESS PROCESS,
                                   MyRoleMessageExchangeImpl instantiatingMessageExchange) {
@@ -147,6 +154,9 @@ public class BpelRuntimeContextImpl implements BpelRuntimeContext {
         _instantiatingMessageExchange = instantiatingMessageExchange;
         _vpu = new JacobVPU();
         _vpu.registerExtension(BpelRuntimeContext.class, this);
+        
+        // @hahnml: Create a new TraDE manager for the process instance
+        _tradeManager = new TraDEManager(bpelProcess._engine.getTraDE_ApiClient(), _iid, bpelProcess._engine.getHostIP(), bpelProcess._engine.getDynamicContainerPort());
 
         _soup = new ExecutionQueueImpl(null);
         _soup.setReplacementMap(_bpelProcess.getReplacementMap(dao.getProcess().getProcessId()));
@@ -268,6 +278,9 @@ public class BpelRuntimeContextImpl implements BpelRuntimeContext {
 
         sendEvent(new ProcessCompletionEvent(null));
         _dao.finishCompletion();
+        
+        // @hahnml: Delete the cached data of the instance from the manager
+        cleanupNotifications();
 
         completeOutstandingMessageExchanges();
 
@@ -458,7 +471,7 @@ public class BpelRuntimeContextImpl implements BpelRuntimeContext {
      *             in case of selection or other fault
      */
     public String readProperty(VariableInstance variable, OProcess.OProperty property) throws FaultException {
-        Node varData = readVariable(variable.scopeInstance, variable.declaration.name, false);
+        Node varData = readVariable(variable.scopeInstance, variable.declaration, false);
 
         OProcess.OPropertyAlias alias = property.getAlias(variable.declaration.type);
         String val = _bpelProcess.extractProperty((Element) varData, alias, variable.declaration.getDescription());
@@ -498,19 +511,72 @@ public class BpelRuntimeContextImpl implements BpelRuntimeContext {
     }
 
 
-    public Node readVariable(Long scopeInstanceId, String varname, boolean forWriting) throws FaultException {
+    public Node readVariable(Long scopeInstanceId, Variable variable, boolean forWriting) throws FaultException {
         ScopeDAO scopedao = _dao.getScope(scopeInstanceId);
-        XmlDataDAO var = scopedao.getVariable(varname);
-        return (var == null || var.isNull()) ? null : var.get();
+        XmlDataDAO var = scopedao.getVariable(variable.name);
+
+        Node result = (var == null || var.isNull()) ? null : var.get();
+
+        // @hahnml: What if a variable is already initialized locally? Should we
+        // overwrite it or maybe introduce corresponding configuration options
+        // through the annotations in the model?
+        // At the moment, local values are prioritized and not overwritten. We
+        // could even think of trying to achieve a value from TraDE and if not
+        // possible use an existing local value as fallback.
+        if (result == null) {
+            if (variable.tradeAssociation != null
+                    && variable.tradeAssociation.dataObjectRef != null) {
+                OScope.CorrelationSet corr = variable.tradeAssociation.dataObjectRef.correlationSet;
+                if (corr != null
+                        && scopedao.getCorrelationSet(corr.name) != null) {
+                    // Use the correlation data to identify the correct data
+                    // object
+                    // instance to push data to
+                    CorrelationSetDAO dao = scopedao
+                            .getCorrelationSet(corr.name);
+
+                    // TODO: Implement multi-value data element support (passing
+                    // a real index value, if the data element is a collection
+                    // element). Maybe we can also reference another process
+                    // variable (counter) in the TraDE association that is
+                    // dynamically used as index value!?
+                    result = _tradeManager.pull(variable, dao, 1);
+                }
+            }
+        }
+
+        return result;
     }
     
     public Node writeVariable(VariableInstance variable, Node changes) {
+        Node result = null;
         ScopeDAO scopeDAO = _dao.getScope(variable.scopeInstance);
         XmlDataDAO dataDAO = scopeDAO.getVariable(variable.declaration.name);
         dataDAO.set(changes);
 
         writeProperties(variable, changes, dataDAO);
-        return dataDAO.get();
+
+        result = dataDAO.get();
+
+        // @hahnml: Handling of data which should be pushed to TraDE Middleware
+        if (variable.declaration.tradeAssociation != null
+                && variable.declaration.tradeAssociation.dataObjectRef != null) {
+            OScope.CorrelationSet corr = variable.declaration.tradeAssociation.dataObjectRef.correlationSet;
+            if (corr != null && scopeDAO.getCorrelationSet(corr.name) != null) {
+                // Use the correlation data to identify the correct data object
+                // instance to push data to
+                CorrelationSetDAO dao = scopeDAO.getCorrelationSet(corr.name);
+
+                // FIXME: Solve the following TODOs
+                // TODO: Implement multi-value data element support (passing
+                // a real index value, if the data element is a collection
+                // element). At the moment we just pass "1" as the default index
+
+                _tradeManager.push(variable.declaration, dao, result, 1);
+            }
+        }
+
+        return result;
     }
 
     public void cancelOutstandingRequests(String channelId) {
@@ -698,6 +764,9 @@ public class BpelRuntimeContextImpl implements BpelRuntimeContext {
 
         _dao.finishCompletion();
         failOutstandingMessageExchanges();
+        
+        // @hahnml: Delete the cached data of the instance from the manager
+        cleanupNotifications();
 
         _bpelProcess._engine._contexts.scheduler.registerSynchronizer(new Scheduler.Synchronizer() {
             public void afterCompletion(boolean success) {
@@ -1610,5 +1679,109 @@ public class BpelRuntimeContextImpl implements BpelRuntimeContext {
 				return null;
 			}
         }
+    }
+	
+	public void registerNotification(
+            DataNotificationChannel dataNotificationChannel, Variable variable,
+            CorrelationSetInstance cset) {
+
+        String notificationID = UUID.randomUUID().toString();
+        final String channelID = dataNotificationChannel.export();
+
+        ScopeDAO scopeDAO = _dao.getScope(cset.scopeInstance);
+        CorrelationSetDAO correlation = scopeDAO
+                .getCorrelationSet(cset.declaration.name);
+
+        final String variableName = variable.name;
+
+        // Register a notification at the TraDE Middleware and remember the
+        // external notification ID for later resolution of the correct
+        // channel
+        try {
+            String tradeNotificationID = _tradeManager.registerNotification(
+                    notificationID, variable, correlation);
+
+            _dao.createNotificationDAO(variableName, notificationID,
+                    tradeNotificationID, channelID);
+        } catch (Exception ie) {
+            __log.error(
+                    "TraDE Manager (pid: "
+                            + _iid
+                            + ") creation of a notification for resolving variable data"
+                            + " caused an exception at the TraDE Middleware. Resolution of data is retried by polling of required resources.",
+                    ie);
+        }
+    }
+
+    protected void dataNotificationEvent(final String dataNotificationID,
+            final String dataContainer) {
+        // Ignore notification events after the process is finished.
+        if (ProcessState.isFinished(_dao.getState())) {
+            return;
+        }
+
+        // Try to resolve the notification DAO
+        NotificationDAO notification = _dao.getNotification(dataNotificationID);
+
+        if (notification != null) {
+            final String dataNotificationChannel = notification
+                    .getNotificationChannelID();
+
+            // Delete the registered notification at the middleware using the
+            // external TraDE notification ID
+            _tradeManager.deleteNotification(notification
+                    .getTraDENotificationID());
+
+            // Delete the registered notification DAO from the instance
+            _dao.deleteNotificationDAO(notification);
+
+            // Create a new runnable to trigger the notification channel
+            JacobRunnable jr = new JacobRunnable() {
+                private static final long serialVersionUID = 3178964419165899532L;
+
+                public void run() {
+                    DataNotificationChannel responseChannel = importChannel(
+                            dataNotificationChannel,
+                            DataNotificationChannel.class);
+                    responseChannel.onNotification(dataContainer);
+                }
+            };
+            jr.setChannelID(dataNotificationChannel);
+
+            _vpu.inject(jr);
+            execute();
+        } else {
+            __log.error("No notification was registered for the notification ID ("
+                    + dataNotificationID
+                    + ") for process instance (pid: "
+                    + _iid
+                    + "). This might lead to a blocking of the overall process instance.");
+        }
+    }
+
+    public void cleanupNotifications() {
+        _tradeManager.cleanup(resolveNotificationIDs());
+    }
+
+    public boolean isTradeDataAvailaibe(OScope.Variable variable,
+            CorrelationSetInstance cset) {
+        ScopeDAO scopeDAO = _dao.getScope(cset.scopeInstance);
+        CorrelationSetDAO correlation = scopeDAO
+                .getCorrelationSet(cset.declaration.name);
+
+        return _tradeManager.isDataAvailable(variable, correlation);
+    }
+
+    private Collection<String> resolveNotificationIDs() {
+        List<String> resultingIDs = new ArrayList<String>();
+
+        // Resolve the external TraDE notification IDs
+        Collection<NotificationDAO> notifications = _dao.getNotifications();
+
+        for (NotificationDAO notif : notifications) {
+            resultingIDs.add(notif.getTraDENotificationID());
+        }
+
+        return resultingIDs;
     }
 }

@@ -239,6 +239,19 @@ public class OAssign extends OActivity {
         public OScope.Variable getVariable() {
             return variable;
         }
+        
+        /**
+         * Report whether this is a reference to a "message" variable, i.e., a
+         * variable reference that points to a complete message or a part or an
+         * header of a message.
+         * 
+         * @return <code>true</code> if the reference points to a message variable
+         * 
+         * @author hahnml
+         */
+        public boolean isMessageVariableRef() {
+            return variable.type instanceof OMessageVarType && location == null;
+        }
 
         /**
          * Report whether this is a reference to a whole "message"

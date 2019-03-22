@@ -638,6 +638,39 @@ public class BpelProcess {
 						return true;
 					}
 					processInstance.matcherEvent(we.getCorrelatorId(), we.getCorrelationKeySet());
+					break;
+                case DATA_NOTIFICATION:
+                    // @hahnml: Extract notification information from job
+                    // details
+                    String notificationID = (String) we.getDetailsExt().get(
+                            JobDetails.DATA_NOTIFICATION_ID);
+
+                    String dataContainer = (String) we.getDetailsExt().get(
+                            JobDetails.TARGET_DATA_CONTAINER);
+
+                    if (notificationID != null) {
+                        if (__log.isDebugEnabled()) {
+                            __log.debug("handleWorkEvent: Data notification event for process instance "
+                                    + we.getInstanceId());
+                        }
+
+                        BpelRuntimeContextImpl processInstance9 = createRuntimeContext(
+                                procInstance, null, null);
+                        processInstance9.dataNotificationEvent(notificationID,
+                                dataContainer);
+                    }
+                    break;
+                case TERMINATE:
+                    // @hahnml: Clean-up unresolved notifications for an instance terminated through the API
+                    if (__log.isDebugEnabled()) {
+                        __log.debug("handleWorkEvent: Data notification event for process instance "
+                                + we.getInstanceId());
+                    }
+
+                    BpelRuntimeContextImpl processInstance10 = createRuntimeContext(
+                            procInstance, null, null);
+                    processInstance10.cleanupNotifications();
+                    break;
 				}
 			}
 		} finally {

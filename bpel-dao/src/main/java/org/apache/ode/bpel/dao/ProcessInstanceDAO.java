@@ -263,4 +263,33 @@ public interface ProcessInstanceDAO {
     }
 
     Collection<String> getMessageExchangeIds();
+    
+    // @hahnml
+    /**
+     * Creates a new NotificationDAO for the given process instance.
+     * 
+     * @return The created NotificationDAO.
+     */
+    public NotificationDAO createNotificationDAO(String dataContainerName,
+            String notificationID, String tradeNotificationID,
+            String notificationChannelID);
+    
+    /**
+     * Delete previously registered notification.
+     */
+    void deleteNotificationDAO(NotificationDAO notification);
+
+    /**
+     * Provides the NotificationDAO with the given id of the process instance.
+     * 
+     * @return The NotificationDAO with the given id of the instance.
+     */
+    public NotificationDAO getNotification(String notificationID);
+
+    /**
+     * Returns all the notifications belonging to this instance.
+     * 
+     * @return
+     */
+    Collection<NotificationDAO> getNotifications();
 }

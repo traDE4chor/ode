@@ -37,6 +37,7 @@ import org.apache.ode.bpel.o.OScope;
 import org.apache.ode.bpel.o.OScope.Variable;
 import org.apache.ode.bpel.runtime.channels.ActivityRecoveryChannel;
 import org.apache.ode.bpel.runtime.channels.FaultData;
+import org.apache.ode.bpel.runtime.channels.DataNotificationChannel;
 import org.apache.ode.bpel.runtime.channels.InvokeResponseChannel;
 import org.apache.ode.bpel.runtime.channels.PickResponseChannel;
 import org.apache.ode.bpel.runtime.channels.TimerResponseChannel;
@@ -95,7 +96,9 @@ public interface BpelRuntimeContext {
 	 *            variable to read
 	 * @return
 	 */
-	Node readVariable(Long scopeInstanceId, String varname, boolean forWriting) throws FaultException;
+	// @hahnml: Changed the variable parameter from string (varname) to
+    // OScope.Variable in order to access the variable declaration
+    Node readVariable(Long scopeInstanceId, Variable variable, boolean forWriting) throws FaultException;
 
 	/**
 	 * Fetches the my-role endpoint reference data.
@@ -350,4 +353,40 @@ public interface BpelRuntimeContext {
 	ClassLoader getProcessClassLoader();
 
 	ExtensionOperation createExtensionActivityImplementation(QName name);
+	
+	/**
+     * Registers a data notification for future notification of data
+     * availability at the TraDE Middleware.
+     * 
+     * @param dataNotificationChannel
+     *            channel to use for notifications about available data.
+     * @param variable
+     *            for which a notification should be registered.
+     * @param cset
+     *            the correlation set instance which allows to uniquely identify
+     *            a process instance from outside the engine. This data is used
+     *            for correlation of data element instances at the TraDE
+     *            Middleware.
+     *            
+     * @author hahnml
+     */
+    void registerNotification(DataNotificationChannel dataNotificationChannel,
+            Variable variable, CorrelationSetInstance cset);
+
+    /**
+     * Checks whether the variable data is available at the TraDE Middleware or
+     * not.
+     * 
+     * @param variable
+     *            for which data should be retrieved.
+     * @param cset
+     *            the correlation set instance which allows to uniquely identify
+     *            a process instance from outside the engine. This data is used
+     *            for correlation of data element instances at the TraDE
+     *            Middleware.
+     * @return True, if the data is availabe. False, otherwise.
+     *
+     * @author hahnml
+     */
+    boolean isTradeDataAvailaibe(Variable variable, CorrelationSetInstance cset);
 }

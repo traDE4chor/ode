@@ -29,6 +29,10 @@ import org.apache.ode.jacob.vpu.JacobVPU;
  * aspect of the process.
  */
 public abstract class JacobObject implements Serializable {
+    
+    // @hahnml: Id to identify the channel related to the JacobObject
+    protected String channelID = "";
+    
     public abstract Set<Method> getImplementedMethods();
 
     /**
@@ -129,4 +133,12 @@ public abstract class JacobObject implements Serializable {
         return "<JacobObject:" + getClassName() + ">";
     }
 
+    // @hahnml
+    public String getChannelID() {
+        return channelID;
+    }
+    
+    public void setChannelID(String channelID) {
+        this.channelID = channelID;
+    }
 }

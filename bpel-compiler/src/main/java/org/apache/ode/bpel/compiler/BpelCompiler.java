@@ -61,6 +61,7 @@ import org.apache.ode.bpel.compiler.bom.Correlation;
 import org.apache.ode.bpel.compiler.bom.CorrelationSet;
 import org.apache.ode.bpel.compiler.bom.Expression;
 import org.apache.ode.bpel.compiler.bom.Expression11;
+import org.apache.ode.bpel.compiler.bom.ExtensibilityQNames;
 import org.apache.ode.bpel.compiler.bom.Extension;
 import org.apache.ode.bpel.compiler.bom.FaultHandler;
 import org.apache.ode.bpel.compiler.bom.Import;
@@ -77,6 +78,7 @@ import org.apache.ode.bpel.compiler.bom.Scope;
 import org.apache.ode.bpel.compiler.bom.ScopeActivity;
 import org.apache.ode.bpel.compiler.bom.ScopeLikeActivity;
 import org.apache.ode.bpel.compiler.bom.TerminationHandler;
+import org.apache.ode.bpel.compiler.bom.TraDEAssociation;
 import org.apache.ode.bpel.compiler.bom.Variable;
 import org.apache.ode.bpel.compiler.wsdl.Definition4BPEL;
 import org.apache.ode.bpel.compiler.wsdl.WSDLFactory4BPEL;
@@ -105,6 +107,9 @@ import org.apache.ode.bpel.o.ORethrow;
 import org.apache.ode.bpel.o.OScope;
 import org.apache.ode.bpel.o.OSequence;
 import org.apache.ode.bpel.o.OTerminationHandler;
+import org.apache.ode.bpel.o.OTraDEAssociation;
+import org.apache.ode.bpel.o.OTraDEAssociation.ODataModelRef;
+import org.apache.ode.bpel.o.OTraDEAssociation.ODataObjectRef;
 import org.apache.ode.bpel.o.OVarType;
 import org.apache.ode.bpel.o.OXsdTypeVarType;
 import org.apache.ode.bpel.o.OXslSheet;
@@ -126,6 +131,7 @@ import org.apache.xerces.xni.parser.XMLEntityResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 
 /**
@@ -185,6 +191,15 @@ public abstract class BpelCompiler implements CompilerContext {
     private URI _processURI;
     
     private final Set<String> _declaredExtensionNS = new HashSet<String>();
+    
+    // @hahnml: We use this map to remember all TraDE associations that refer to
+    // a correlationSet we have to resolve. This is required since the TraDE
+    // associations containing correlationSet references are attached to
+    // variables which are compiled (by default) before the correlationSets.
+    // Therefore, we are not able to directly resolve them during the
+    // compilation of the associations and have to wait until the
+    // correlationSets are compiled.
+    private final HashMap<String, List<OTraDEAssociation>> _tradeAssociations = new HashMap<String, List<OTraDEAssociation>>();
 
     BpelCompiler(WSDLFactory4BPEL wsdlFactory) {
         _wsdlFactory = wsdlFactory;
@@ -797,6 +812,11 @@ public abstract class BpelCompiler implements CompilerContext {
                 __log.debug("Compiled process digest: " + digest + "\nguid: " + _oprocess.guid);
             }
         }
+        
+        // @hahnml: Allows to link a process model with a TraDE data model to
+        // enable transparent data exchange
+        _oprocess.tradeAssociation = compileTradeAssociation(process);
+        
         return _oprocess;
     }
 
@@ -1122,6 +1142,19 @@ public abstract class BpelCompiler implements CompilerContext {
         for (int j = 0; j < setprops.length; ++j)
             ocset.properties.add(resolveProperty(setprops[j]));
         oscope.addCorrelationSet(ocset);
+        
+        // @hahnml: Try to resolve the correlationSets referenced in one or more
+        // TraDE associations
+        if (_tradeAssociations.containsKey(ocset.name)) {
+            for (OTraDEAssociation assoc : _tradeAssociations.get(ocset.name)) {
+                // Check if it is a Trigger or DataObjectReference associations
+                if (assoc.dataObjectRef != null) {
+                    assoc.dataObjectRef.correlationSet = ocset;
+                } else if (assoc.trigger != null) {
+                    assoc.trigger.dataObjectRef.correlationSet = ocset;
+                }
+            }
+        }
     }
 
     public OActivity getCurrent() {
@@ -1129,7 +1162,7 @@ public abstract class BpelCompiler implements CompilerContext {
     }
 
     public void compile(OActivity context, BpelObject source, Runnable run) {
-        DefaultActivityGenerator.defaultExtensibilityElements(context, source);
+        DefaultActivityGenerator.defaultExtensibilityElements(this, context, source);
         _structureStack.push(context,source);
         try {
             run.run();
@@ -1441,6 +1474,9 @@ public abstract class BpelCompiler implements CompilerContext {
         ovar.debugInfo = createDebugInfo(src, null);
         
         ovar.extVar = compileExtVar(src);
+        
+        // @hahnml: Allows to link variables with TraDE data objects
+        ovar.tradeAssociation = compileTradeAssociation(src);
 
         oscope.addLocalVariable(ovar);
 
@@ -1797,6 +1833,72 @@ public abstract class BpelCompiler implements CompilerContext {
         oextvar.related = resolveVariable(src.getRelated());
         
         return oextvar;
+    }
+    
+    /**
+     * Compile a TraDE association.
+     * 
+     * @param src
+     *            a variable or process BpelObject
+     * @return compiled {@link OTraDEAssociation} representation.
+     * 
+     * @author hahnml
+     */
+    private OTraDEAssociation compileTradeAssociation(BpelObject src) {
+        OTraDEAssociation result = null;
+
+        if (src instanceof Variable || src instanceof Process) {
+            Element element = src
+                    .getExtensibilityElement(ExtensibilityQNames.ASSOCIATION);
+            if (element != null) {
+                TraDEAssociation extElement = new TraDEAssociation(element);
+
+                OTraDEAssociation obj = new OTraDEAssociation();
+                if (src instanceof Process) {
+                    // Process: Look for a dataModelRef association
+                    if (extElement.getDataModelRef() == null)
+                        throw new CompilationException(
+                                __cmsgs.errMissingTraDEDataModelReference());
+
+                    OTraDEAssociation.ODataModelRef modelRef = new ODataModelRef();
+                    modelRef.dataModelQName = new QName(extElement
+                            .getDataModelRef().getDataModelNamespace(),
+                            extElement.getDataModelRef().getDataModelName());
+                    obj.dataModelRef = modelRef;
+                } else {
+                    // Variable: Look for a dataObjectRef association
+                    if (extElement.getDataObjectRef() == null)
+                        throw new CompilationException(
+                                __cmsgs.errMissingTraDEDataObjectReference(((Variable) src)
+                                        .getName()));
+
+                    OTraDEAssociation.ODataObjectRef objectRef = new ODataObjectRef();
+                    objectRef.dataObjectName = extElement.getDataObjectRef()
+                            .getDataObjectName();
+                    objectRef.dataElementName = extElement.getDataObjectRef()
+                            .getDataElementName();
+
+                    // Remember the association to resolve the correlationSet
+                    // later
+                    String cSetName = extElement.getDataObjectRef()
+                            .getCorrelationSet();
+                    if (!_tradeAssociations.containsKey(cSetName)) {
+                        // Add a new entry with an empty list for the specified
+                        // correlationSet
+                        _tradeAssociations.put(cSetName,
+                                new ArrayList<OTraDEAssociation>());
+                    }
+                    // Add the TraDE association to the list
+                    _tradeAssociations.get(cSetName).add(obj);
+
+                    obj.dataObjectRef = objectRef;
+                }
+
+                result = obj;
+            }
+        }
+
+        return result;
     }
 
     private static class StructureStack {

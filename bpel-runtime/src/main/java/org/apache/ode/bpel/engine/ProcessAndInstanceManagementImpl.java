@@ -1511,4 +1511,12 @@ public class ProcessAndInstanceManagementImpl implements InstanceManagement, Pro
         }
     }
 
+    public InstanceInfoDocument notifyInstanceAboutData(final Long iid,
+            final String dataContainerName, final String notificationID) throws ProcessingException {
+        DebuggerSupport debugSupport = getDebugger(iid);
+        assert debugSupport != null : "getDebugger(Long) returned NULL!";
+        debugSupport.handleIncomingNotification(iid, dataContainerName, notificationID);
+
+        return getInstanceInfo(iid);
+    }
 }

@@ -102,7 +102,7 @@ public class MyRoleMessageExchangeImplTest extends TestCase {
         
         contexts = new Contexts();
         contexts.scheduler = scheduler;
-        engine = new BpelEngineImpl(contexts);
+        engine = new BpelEngineImpl(contexts, null, null, null);
 
         myRoleMexImpl = new TestMyRoleMessageExchangeImpl();
         context.assertIsSatisfied();

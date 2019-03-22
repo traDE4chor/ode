@@ -215,10 +215,30 @@ public interface Scheduler {
          * no process instance is able to process it and the route has been added
          * meanwhile. It just retries the correlation.
          */
-        MEX_MATCHER
+        MEX_MATCHER,
+        
+        /**
+         * is used to handle received TraDE data notifications and continue 
+         * process instance execution as soon as required data is available
+         * at the TraDE Middleware
+         * 
+         * @author hahnml
+         */
+        DATA_NOTIFICATION,
+        
+        /**
+         * is used to clean-up unresolved notifications of a process instance
+         * if the instance is actively terminated through ODE's InstanceManagement API
+         * 
+         * @author hahnml
+         */
+        TERMINATE
     }
     
-    public static class JobDetails {
+    // @hahnml: Serializable interface added
+    public static class JobDetails implements Serializable {
+        private static final long serialVersionUID = 106190038343920923L;
+        
         public Long instanceId;
         public String mexId;
         public String processId;
@@ -229,6 +249,10 @@ public interface Scheduler {
         public Integer retryCount;
         public Boolean inMem;
         public Map<String, Object> detailsExt = new HashMap<String, Object>();
+        
+        // @hahnml: Some keys to store data in the details extension map
+        public static final String TARGET_DATA_CONTAINER = "dataContainer";
+        public static final String DATA_NOTIFICATION_ID = "dataNotificationID";
         
         public Boolean getInMem() {
             return inMem == null ? false : inMem;

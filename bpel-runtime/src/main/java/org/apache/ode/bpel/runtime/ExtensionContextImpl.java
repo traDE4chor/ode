@@ -96,7 +96,7 @@ public class ExtensionContextImpl implements ExtensionContext {
 
     public Node readVariable(OScope.Variable variable) throws FaultException {
         VariableInstance vi = _scopeFrame.resolve(variable);
-        return _context.readVariable(vi.scopeInstance, vi.declaration.name, true);
+        return _context.readVariable(vi.scopeInstance, vi.declaration, true);
     }
 
     public void writeVariable(String variableName, Node value) throws FaultException {
@@ -110,7 +110,7 @@ public class ExtensionContextImpl implements ExtensionContext {
 
     public Node readVariable(String variableName) throws FaultException {
         VariableInstance vi = _scopeFrame.resolve(getVisibleVariable(variableName));
-        return _context.readVariable(vi.scopeInstance, vi.declaration.name, true);
+        return _context.readVariable(vi.scopeInstance, vi.declaration, true);
     }
 
     public void writeVariable(Variable variable, Node value) throws FaultException {

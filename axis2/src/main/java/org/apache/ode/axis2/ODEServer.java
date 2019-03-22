@@ -517,6 +517,11 @@ public class ODEServer {
         _scheduler = createScheduler();
         _scheduler.setJobProcessor(_bpelServer);
         
+        // @hahnml: Forward the TraDE Middleware API endpoint
+        _bpelServer.setTraDE_Middleware_URL(_odeConfig.getTraDEURL());
+        _bpelServer.setHostIp(_odeConfig.getHostIP());
+        _bpelServer.setDynamicContainerPort(_odeConfig.getDynamicContainerPort());
+        
         BpelServerImpl.PolledRunnableProcessor polledRunnableProcessor = new BpelServerImpl.PolledRunnableProcessor();
         polledRunnableProcessor.setPolledRunnableExecutorService(_executorService);
         polledRunnableProcessor.setContexts(_bpelServer.getContexts());

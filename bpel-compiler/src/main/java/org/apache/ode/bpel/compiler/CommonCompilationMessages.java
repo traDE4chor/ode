@@ -495,4 +495,21 @@ public class CommonCompilationMessages extends CompilationMessageBundle {
 		return this.formatCompilationMessage("Empty sequences are forbidden.");
 	}
 
+	// @hahnml: Some TraDE-related messages
+    /** A required TraDE data model reference was not specified. */
+    public CompilationMessage errMissingTraDEDataModelReference() {
+        return this
+                .formatCompilationMessage("A required TraDE data model reference was not present.");
+    }
+
+    /**
+     * A required TraDE data object reference was not specified for variable
+     * {0}.
+     */
+    public CompilationMessage errMissingTraDEDataObjectReference(String varName) {
+        return this
+                .formatCompilationMessage(
+                        "The variable \"{0}\" has an empty TraDE association where a reference to a data object is missing or specified incorrect.",
+                        varName);
+    }
 }

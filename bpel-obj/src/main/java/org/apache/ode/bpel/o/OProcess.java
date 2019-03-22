@@ -80,6 +80,9 @@ public class OProcess extends OBase {
 
 	/** All must-understand extensions in the process. **/
 	public final Set<OExtension> mustUnderstandExtensions = new HashSet<OExtension>();
+	
+	//@hahnml: Allows to link a process with a TraDE data model
+	public OTraDEAssociation tradeAssociation;
 
 	public OProcess(String bpelVersion) {
 		super(null);

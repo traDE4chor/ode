@@ -70,7 +70,7 @@ import org.apache.ode.utils.Namespaces;
 import org.apache.ode.utils.msg.MessageBundle;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
-
+import io.swagger.trade.client.jersey.ApiClient;
 
 
 /**
@@ -125,10 +125,26 @@ public class BpelEngineImpl implements BpelEngine {
     private final Map<QName, Long> _hydratedSizes = new HashMap<QName, Long>();
     private final Map<QName, Long> _unhydratedSizes = new HashMap<QName, Long>();
     
-    public BpelEngineImpl(Contexts contexts) {
+    // @hahnml: Holds the shared instance of the TraDE middleware API client
+    private ApiClient _tradeApiClient;
+    
+    // @hahnml
+    private String _tradeMiddlewareURL;
+    private String _hostIP;
+    private String _dynamicContainerPort;
+    
+    public BpelEngineImpl(Contexts contexts, String tradeMiddlewareURL, String hostIP, String dynamicContainerPort) {
         _contexts = contexts;
         _sharedEps = new SharedEndpoints();
         _sharedEps.init();
+        
+        _tradeMiddlewareURL = tradeMiddlewareURL;
+        _hostIP = hostIP;
+        _dynamicContainerPort = dynamicContainerPort;
+        
+        // @hahnml: Create a new TraDE middleware API client instance
+        _tradeApiClient = new ApiClient();
+        _tradeApiClient.setBasePath(tradeMiddlewareURL);
     }
 
     public SharedEndpoints getSharedEndpoints() {
@@ -855,6 +871,23 @@ public class BpelEngineImpl implements BpelEngine {
             }
         }
         return ret;
+    }
+    
+    // @hahnml: Return the shared instance of the TraDE middleware API client
+    public ApiClient getTraDE_ApiClient() {
+        return _tradeApiClient;
+    }
+
+    public String getTradeMiddlewareURL() {
+        return _tradeMiddlewareURL;
+    }
+
+    public String getHostIP() {
+        return _hostIP;
+    }
+
+    public String getDynamicContainerPort() {
+        return _dynamicContainerPort;
     }
 }
 

@@ -25,6 +25,7 @@ import org.apache.ode.bpel.dao.CorrelationSetDAO;
 import org.apache.ode.bpel.dao.CorrelatorDAO;
 import org.apache.ode.bpel.dao.FaultDAO;
 import org.apache.ode.bpel.dao.MessageExchangeDAO;
+import org.apache.ode.bpel.dao.NotificationDAO;
 import org.apache.ode.bpel.dao.ProcessDAO;
 import org.apache.ode.bpel.dao.ProcessInstanceDAO;
 import org.apache.ode.bpel.dao.ScopeDAO;
@@ -68,6 +69,9 @@ public class ProcessInstanceDaoImpl extends DaoBaseImpl implements ProcessInstan
     private int _failureCount;
     private Date _failureDateTime;
     private Map<String, ActivityRecoveryDAO> _activityRecoveries = new HashMap<String, ActivityRecoveryDAO>();
+    
+    //@hahnml
+    private Map<String, NotificationDAO> _notifications = new HashMap<String, NotificationDAO>();
 
     // TODO: Remove this, we should be using the main event store...
     private List<ProcessInstanceEvent> _events = new ArrayList<ProcessInstanceEvent>();
@@ -414,5 +418,25 @@ public class ProcessInstanceDaoImpl extends DaoBaseImpl implements ProcessInstan
 
     public Collection<String> getMessageExchangeIds() {
         return _messageExchanges.keySet();
+    }
+    
+    public NotificationDAO createNotificationDAO(String dataContainerName,
+            String notificationID, String tradeNotificationID,
+            String notificationChannelID) {
+        return _notifications.put(notificationID, new NotificationDaoImpl(
+                dataContainerName, notificationID, tradeNotificationID,
+                notificationChannelID, this));
+    }
+
+    public NotificationDAO getNotification(String notificationID) {
+        return _notifications.get(notificationID);
+    }
+
+    public Collection<NotificationDAO> getNotifications() {
+        return _notifications.values();
+    }
+
+    public void deleteNotificationDAO(NotificationDAO notification) {
+        _notifications.remove(notification.getNotificationID());
     }
 }

@@ -43,6 +43,7 @@
         <class>org.apache.ode.dao.jpa.CorrSetProperty</class>
         <class>org.apache.ode.dao.jpa.MexProperty</class>
         <class>org.apache.ode.dao.jpa.XmlDataProperty</class>
+        <class>org.apache.ode.dao.jpa.NotificationDAOImpl</class>
         <properties>
             <property name="openjpa.DynamicEnhancementAgent" value="false"/>
         </properties>

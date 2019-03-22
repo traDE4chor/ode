@@ -276,4 +276,21 @@ public interface InstanceManagement {
     */
     InstanceInfoDocument recoverActivity(Long iid, Long aid, String action);
 
+    /**
+     * @param iid
+     *            ID of the process instance the notification is for
+     * @param dataContainerName
+     *            The name of the data container (BPEL variable) for which data
+     *            is available
+     * @param notificationID
+     *            The unique ID of the registered notification which was
+     *            successfully triggered and lead to this request.
+     * @return instance information
+     * @throws ProcessingException
+     * 
+     * @author hahnml
+     */
+    InstanceInfoDocument notifyInstanceAboutData(final Long iid,
+            final String dataContainerName, final String notificationID)
+            throws ProcessingException;
 }

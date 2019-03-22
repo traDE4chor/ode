@@ -79,9 +79,17 @@ HIBERNATE           = ["org.hibernate:hibernate-core:jar:4.3.11.Final", "org.jav
                         "dom4j:dom4j:jar:1.6.1", "org.hibernate.common:hibernate-commons-annotations:jar:4.0.5.Final", 
                         "org.hibernate.javax.persistence:hibernate-jpa-2.1-api:jar:1.0.0.Final"  , "org.jboss:jandex:jar:1.1.0.Final", 
                         "org.jboss.logging:jboss-logging:jar:3.1.3.GA" , "org.jboss.logging:jboss-logging-annotations:jar:1.2.0.Beta1"]
-
+HK2                 = [
+                        "org.glassfish.hk2:hk2-api:jar:2.2.0",
+                        "org.glassfish.hk2:hk2-utils:jar:2.2.0",
+                        "org.glassfish.hk2:hk2-locator:jar:2.2.0",
+                        "org.glassfish.hk2.external:aopalliance-repackaged:jar:2.2.0",
+                        "org.glassfish.hk2.external:javax.inject:jar:2.2.0",
+                        "org.glassfish.hk2:osgi-resource-locator:jar:1.0.1"
+                      ]
 HSQLDB              = "org.hsqldb:hsqldb:jar:2.3.3"
 JAVAX               = struct(
+  :annotation       =>"javax.annotation:javax.annotation-api:jar:1.2",
   :activation       =>"javax.activation:activation:jar:1.1",
   #:activation       =>"geronimo-spec:geronimo-spec-activation:jar:1.0.2-rc4",
   :connector        =>"org.apache.geronimo.specs:geronimo-j2ee-connector_1.6_spec:jar:1.0",
@@ -92,11 +100,25 @@ JAVAX               = struct(
   :servlet          =>"org.apache.geronimo.specs:geronimo-servlet_2.4_spec:jar:1.0",
   :stream           =>"org.codehaus.woodstox:stax2-api:jar:4.0.0",
   :transaction      =>"org.apache.geronimo.specs:geronimo-jta_1.1_spec:jar:1.1.1",
-  :resource         =>"org.apache.geronimo.specs:geronimo-j2ee-connector_1.6_spec:jar:1.0"
+  :resource         =>"org.apache.geronimo.specs:geronimo-j2ee-connector_1.6_spec:jar:1.0",
+  :validation       =>"javax.validation:validation-api:jar:1.1.0.Final",
+  :wsrs             =>"javax.ws.rs:javax.ws.rs-api:jar:2.0"
 )
+JACKSON             = [
+                        "com.fasterxml.jackson.core:jackson-core:jar:2.3.2",
+                        "com.fasterxml.jackson.core:jackson-annotations:jar:2.3.2",
+                        "com.fasterxml.jackson.core:jackson-databind:jar:2.3.2",
+                        "com.fasterxml.jackson.jaxrs:jackson-jaxrs-json-provider:jar:2.3.2",
+                        "com.google.guava:guava:jar:20.0"
+                      ]
 JAXEN               = "jaxen:jaxen:jar:1.1.6"
 JBI                 = group("org.apache.servicemix.specs.jbi-api-1.0", :under=>"org.apache.servicemix.specs", :version=>"1.1.0")
 JENCKS              = "org.jencks:jencks:jar:all:2.2"
+JERSEY              = [
+                        "org.glassfish.jersey.core:jersey-client:jar:2.6",
+                        "org.glassfish.jersey.media:jersey-media-multipart:jar:2.6",
+                        "org.glassfish.jersey.media:jersey-media-json-jackson:jar:2.6"
+                      ]
 JIBX                = "org.jibx:jibx-run:jar:1.2.1"
 KARAF               = [
                         "org.apache.felix:org.osgi.core:jar:1.4.0",
@@ -107,6 +129,7 @@ KARAF               = [
                       ]
 LOG4J               = "log4j:log4j:jar:1.2.17"
 LOG4J2               = group("log4j-api", "log4j-core", "log4j-slf4j-impl", "log4j-web", :under=>"org.apache.logging.log4j", :version=>"2.3")
+MIGBASE64           = "com.brsanthu:migbase64:jar:2.2"
 OPENJPA             = ["org.apache.openjpa:openjpa:jar:2.4.2",
                        "net.sourceforge.serp:serp:jar:1.15.1",
                        "org.apache.xbean:xbean-asm5-shaded:jar:4.5"]
@@ -277,6 +300,16 @@ TOMEE = struct(
         :oro => "oro:oro:jar:2.0.8",
         :openjpa => ["org.apache.openjpa:openjpa:jar:2.4.2","net.sourceforge.serp:serp:jar:1.15.1"]
 )
+
+TRADE_API           = [ JERSEY, JACKSON, MIGBASE64, JAVAX.wsrs, JAVAX.annotation, JAVAX.validation, HK2,
+                        "org.javassist:javassist:jar:3.18.1-GA",
+                        "org.jvnet.mimepull:mimepull:jar:1.9.3",
+                        "org.glassfish.jersey.core:jersey-common:jar:2.6",
+                        "org.glassfish.jersey.core:jersey-server:jar:2.6",
+                        "org.glassfish.jersey.bundles.repackaged:jersey-guava:jar:2.6",
+                        "com.fasterxml.jackson.jaxrs:jackson-jaxrs-base:jar:2.3.2",
+                        "com.fasterxml.jackson.module:jackson-module-jaxb-annotations:jar:2.3.2"
+                      ]
 
 ODE_WEB_CONSOLE     = "org.apache.ode:ode-console:jar:0.1.0"
 TUCKEY_URLREWRITE   = "org.tuckey:urlrewritefilter:jar:4.0.4"

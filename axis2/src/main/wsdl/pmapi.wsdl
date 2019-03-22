@@ -248,6 +248,20 @@
     <message name="managementFault">
         <part name="managementFault" element="tns:ManagementFault"/>
     </message>
+    
+    <!-- hahnml -->
+    <message name="notifyInstanceAboutDataRequest">
+		<part name="iid" type="xsd:long" />
+		<part name="dataContainerName" type="xsd:string" />
+		<part name="notificationID" type="xsd:string" />
+	</message>
+	<message name="notifyInstanceAboutDataResponse">
+		<part name="instance-info" type="typ:tInstanceInfo" />
+	</message>
+	<message name="notifyInstanceAboutDataFault">
+		<part name="managementFault" element="tns:ManagementFault"></part>
+	</message>
+    <!-- /hahnml -->
 
     <portType name="ProcessManagementPortType">
         <operation name="listProcesses">
@@ -403,6 +417,11 @@
             <output message="tns:getCommunicationOutput"/>
             <fault name="ManagementFault" message="tns:managementFault"/>
         </operation>
+        <operation name="notifyInstanceAboutData">
+			<input message="tns:notifyInstanceAboutDataRequest"></input>
+			<output message="tns:notifyInstanceAboutDataResponse"></output>
+			<fault name="ManagementFault" message="tns:notifyInstanceAboutDataFault"></fault>
+		</operation>
     </portType>
 
     <binding name="ProcessManagementBinding" type="tns:ProcessManagementPortType">
@@ -771,6 +790,21 @@
                 <soap:fault name="ManagementFault" use="literal"/>
              </fault>
         </operation>
+        <!-- hahnml -->
+        <operation name="notifyInstanceAboutData">
+			<soap:operation
+				soapAction="http://www.apache.org/ode/pmapi/notifyInstanceAboutData" />
+			<input>
+				<soap:body use="literal" namespace="http://www.apache.org/ode/pmapi" />
+			</input>
+			<output>
+				<soap:body use="literal" namespace="http://www.apache.org/ode/pmapi" />
+			</output>
+			<fault name="ManagementFault">
+				<soap:fault use="literal" name="ManagementFault" />
+			</fault>
+		</operation>
+		<!-- /hahnml -->
     </binding>
 
     <service name="ProcessManagementService">

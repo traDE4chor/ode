@@ -185,7 +185,7 @@ public class ScopeFrame implements Serializable {
                 throw new BpelEngineException(e);
             }
         } else /* not external */ {
-            Node data = brc.readVariable(variable.scopeInstance,variable.declaration.name, forWriting);
+            Node data = brc.readVariable(variable.scopeInstance,variable.declaration, forWriting);
             if (data == null) {
                 // Special case of messageType variables with no part
                 if (variable.declaration.type instanceof OMessageVarType) {
