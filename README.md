@@ -1,4 +1,4 @@
-[![Docker Status](https://dockerbuildbadges.quelltext.eu/status.svg?organization=trade4chor&repository=trade-ode)](https://hub.docker.com/r/trade4chor/trade-ode/)
+[![Docker Status](https://img.shields.io/docker/cloud/build/trade4chor/trade-ode.svg)](https://hub.docker.com/r/trade4chor/trade-ode/)
 
 # Apache ODE
 
